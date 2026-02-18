@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
+import SignupPage from './components/SignupPage';
 import SuperadminDashboard from './components/dashboards/SuperadminDashboard';
 import AdminDashboard from './components/dashboards/AdminDashboard';
 import GreenChampionDashboard from './components/dashboards/GreenChampionDashboard';
@@ -18,10 +20,11 @@ export interface User {
 
 const LS_KEY = 'currentUser';
 
-const roleToName = (role: UserRole) =>
-  role.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+type ViewState = 'landing' | 'login' | 'signup';
 
 function App() {
+  const [currentView, setCurrentView] = useState<ViewState>('landing');
+
   // Rehydrate from localStorage on first render
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -32,24 +35,44 @@ function App() {
     }
   });
 
-  const handleLogin = (role: UserRole, email: string) => {
-    const user: User = {
-      id: `${role}-${Date.now()}`,
-      email,
-      role,
-      name: roleToName(role),
-    };
+  const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem(LS_KEY, JSON.stringify(user));
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setCurrentView('landing'); // Reset to landing page on logout
     localStorage.removeItem(LS_KEY);
   };
 
   if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} />;
+    switch (currentView) {
+      case 'login':
+        return (
+          <LoginPage
+            onLogin={handleLogin}
+            onNavigateToSignup={() => setCurrentView('signup')}
+            onBack={() => setCurrentView('landing')}
+          />
+        );
+      case 'signup':
+        return (
+          <SignupPage
+            onSignupSuccess={(_email) => {
+              // Auto-fill email in login or just go to login?
+              // Let's go to Login
+              setCurrentView('login');
+              // Optional: Show success toast (not implemented yet, simple flow for now)
+            }}
+            onNavigateToLogin={() => setCurrentView('login')}
+          // onBack={() => setCurrentView('landing')} // Signup usually has back to login
+          />
+        );
+      case 'landing':
+      default:
+        return <LandingPage onGetStarted={() => setCurrentView('login')} />;
+    }
   }
 
   const renderDashboard = () => {
@@ -67,7 +90,13 @@ function App() {
       default:
         // Fallback safety: clear bad state and show login
         localStorage.removeItem(LS_KEY);
-        return <LoginPage onLogin={handleLogin} />;
+        return (
+          <LoginPage
+            onLogin={handleLogin}
+            onNavigateToSignup={() => setCurrentView('signup')}
+            onBack={() => setCurrentView('landing')}
+          />
+        );
     }
   };
 

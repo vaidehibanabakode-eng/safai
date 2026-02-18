@@ -1,5 +1,4 @@
-import React, { ReactNode, useEffect, useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import React, { ReactNode, useEffect } from 'react';
 
 interface SidebarItem {
   icon: ReactNode;
@@ -10,14 +9,14 @@ interface SidebarItem {
 
 interface SidebarProps {
   items: SidebarItem[];
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ items }) => {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-
+const Sidebar: React.FC<SidebarProps> = ({ items, isOpen, onClose }) => {
   // Lock body scroll when mobile sidebar is open
   useEffect(() => {
-    if (isMobileOpen) {
+    if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -25,33 +24,24 @@ const Sidebar: React.FC<SidebarProps> = ({ items }) => {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isMobileOpen]);
+  }, [isOpen]);
 
   // Close on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsMobileOpen(false);
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [onClose]);
 
   return (
     <>
-      {/* Mobile Toggle Button */}
-      <button
-        onClick={() => setIsMobileOpen((s) => !s)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md border border-gray-200"
-        aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
-      >
-        {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-      </button>
-
       {/* Mobile Overlay */}
-      {isMobileOpen && (
+      {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsMobileOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+          onClick={onClose}
           aria-hidden="true"
         />
       )}
@@ -60,14 +50,12 @@ const Sidebar: React.FC<SidebarProps> = ({ items }) => {
       <aside
         className={[
           'fixed left-0 top-16 z-40 w-80',
-          'h-[calc(100vh-4rem)]',                // header is 4rem tall
+          'h-[calc(100vh-4rem)]',
           'bg-white border-r border-gray-200 shadow-sm',
-          'transform transition-transform duration-300',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-          // Make it scrollable on mobile
+          'transform transition-transform duration-300 ease-in-out',
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           'overflow-y-auto overscroll-contain touch-pan-y',
         ].join(' ')}
-        // Safe-area padding for iOS bottom inset
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
       >
         <nav className="p-4 sm:p-6">
@@ -77,12 +65,12 @@ const Sidebar: React.FC<SidebarProps> = ({ items }) => {
                 <button
                   onClick={() => {
                     item.onClick?.();
-                    setIsMobileOpen(false); // Close mobile menu on item click
+                    onClose(); // Close mobile menu on item click
                   }}
                   className={[
                     'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200',
                     item.active
-                      ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30'
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30'
                       : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
                   ].join(' ')}
                 >
@@ -90,6 +78,9 @@ const Sidebar: React.FC<SidebarProps> = ({ items }) => {
                     {item.icon}
                   </div>
                   <span className="font-medium truncate">{item.label}</span>
+                  {item.active && (
+                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white/50" />
+                  )}
                 </button>
               </li>
             ))}

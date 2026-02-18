@@ -8,15 +8,15 @@ interface StatCardProps {
     value: string;
     isPositive: boolean;
   };
-  color?: 'green' | 'blue' | 'yellow' | 'red' | 'purple';
+  color?: 'green' | 'blue' | 'yellow' | 'red' | 'purple' | 'orange';
 }
 
-const StatCard: React.FC<StatCardProps> = ({ 
-  title, 
-  value, 
-  icon, 
-  trend, 
-  color = 'green' 
+const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  icon,
+  trend,
+  color = 'green'
 }) => {
   const colorClasses = {
     green: {
@@ -43,10 +43,15 @@ const StatCard: React.FC<StatCardProps> = ({
       bg: 'bg-gradient-to-br from-purple-50 to-purple-100',
       icon: 'bg-gradient-to-br from-purple-100 to-purple-200 text-purple-600',
       border: 'border-t-purple-500'
+    },
+    orange: {
+      bg: 'bg-gradient-to-br from-orange-50 to-orange-100',
+      icon: 'bg-gradient-to-br from-orange-100 to-orange-200 text-orange-600',
+      border: 'border-t-orange-500'
     }
   };
 
-  const classes = colorClasses[color];
+  const classes = colorClasses[color] || colorClasses.green;
 
   return (
     <div className={`${classes.bg} rounded-2xl p-6 border border-gray-200 ${classes.border} border-t-4 hover:shadow-lg transition-all duration-200 hover:-translate-y-1`}>
