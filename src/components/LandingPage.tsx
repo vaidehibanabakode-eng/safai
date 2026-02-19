@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Leaf, BarChart3, Users, Shield, Menu, X, ChevronRight, Globe, Recycle } from 'lucide-react';
+import { ArrowRight, Leaf, BarChart3, Users, Shield, Menu, X, ChevronRight, Globe, Recycle, Download } from 'lucide-react';
+
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface LandingPageProps {
     onGetStarted: () => void;
@@ -8,6 +10,7 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const { isInstallable, installApp } = usePWAInstall();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -53,6 +56,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
                     <div className="hidden md:flex items-center gap-4">
                         <button
+                            onClick={() => {
+                                if (isInstallable) {
+                                    installApp();
+                                } else {
+                                    alert("To install SafaiConnect:\n\nDesktop: Click the install icon in your address bar.\nMobile: Tap 'Share' -> 'Add to Home Screen'.");
+                                }
+                            }}
+                            className="px-4 py-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-all flex items-center gap-2"
+                        >
+                            <Download className="w-4 h-4" /> Install App
+                        </button>
+                        <button
                             onClick={onGetStarted}
                             className="px-5 py-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
                         >
@@ -83,6 +98,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                         <button onClick={() => scrollToSection('cta')} className="text-left w-full py-3 px-4 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl font-medium transition-colors">Solutions</button>
                         <button onClick={() => scrollToSection('about')} className="text-left w-full py-3 px-4 text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl font-medium transition-colors">About</button>
                         <div className="h-px bg-gray-100 my-2"></div>
+                        <button
+                            onClick={() => {
+                                if (isInstallable) {
+                                    installApp();
+                                } else {
+                                    alert("To install SafaiConnect:\n\nDesktop: Click the install icon in your address bar.\nMobile: Tap 'Share' -> 'Add to Home Screen'.");
+                                }
+                            }}
+                            className="w-full py-3 text-emerald-600 font-semibold rounded-xl bg-emerald-50 flex items-center justify-center gap-2"
+                        >
+                            <Download className="w-5 h-5" /> Install App
+                        </button>
                         <button
                             onClick={onGetStarted}
                             className="w-full py-3 text-emerald-600 font-semibold rounded-xl bg-emerald-50"
@@ -131,6 +158,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                                 className="w-full sm:w-auto px-8 py-4 bg-emerald-600 text-white rounded-full font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 hover:scale-105 flex items-center justify-center gap-2"
                             >
                                 Start for Free <ArrowRight className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (isInstallable) {
+                                        installApp();
+                                    } else {
+                                        alert("To install SafaiConnect:\n\nDesktop: Click the install icon in your address bar.\nMobile: Tap 'Share' -> 'Add to Home Screen'.");
+                                    }
+                                }}
+                                className="w-full sm:w-auto px-8 py-4 bg-white text-emerald-600 border-2 border-emerald-100 rounded-full font-bold text-lg hover:bg-emerald-50 hover:border-emerald-200 transition-all shadow-md hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2"
+                            >
+                                <Download className="w-5 h-5" /> Install App
                             </button>
                             <button
                                 onClick={() => scrollToSection('features')}

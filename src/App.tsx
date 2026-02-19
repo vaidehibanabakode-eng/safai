@@ -4,7 +4,7 @@ import LoginPage from './components/LoginPage';
 import SignupPage from './components/SignupPage';
 import SuperadminDashboard from './components/dashboards/SuperadminDashboard';
 import AdminDashboard from './components/dashboards/AdminDashboard';
-import GreenChampionDashboard from './components/dashboards/GreenChampionDashboard';
+// import GreenChampionDashboard from './components/dashboards/GreenChampionDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
 import CitizenDashboard from './components/dashboards/CitizenDashboard';
 // import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -81,8 +81,8 @@ function App() {
         return <SuperadminDashboard user={currentUser} onLogout={handleLogout} />;
       case 'admin':
         return <AdminDashboard user={currentUser} onLogout={handleLogout} />;
-      case 'green-champion':
-        return <GreenChampionDashboard user={currentUser} onLogout={handleLogout} />;
+      // case 'green-champion':
+      //   return <GreenChampionDashboard user={currentUser} onLogout={handleLogout} />;
       case 'worker':
         return <WorkerDashboard user={currentUser} onLogout={handleLogout} />;
       case 'citizen':

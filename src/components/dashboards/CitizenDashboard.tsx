@@ -1,47 +1,108 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ClipboardList,
-  MapPin,
   Truck,
-  Star,
-  GraduationCap,
   Bell,
-  Award,
+  Calendar,
+  GraduationCap,
   BarChart3,
   Camera,
   Clock,
-  Calendar,
-
   CheckCircle,
   Zap,
-  Globe,
-  Activity
+  Star,
+  Award,
+  Mic,
+  MicOff,
+  Volume2,
 } from 'lucide-react';
 import { User } from '../../App';
 import Layout from '../common/Layout';
 import StatCard from '../common/StatCard';
 import TrainingSystem from '../training/TrainingSystem';
-import VehicleTracker from '../common/VehicleTracker';
-import HeatMap from '../common/HeatMap';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface CitizenDashboardProps {
   user: User;
   onLogout: () => void;
 }
 
+// Extend EventTarget for webkit speech recognition
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
 const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isListening, setIsListening] = useState(false);
+  const [description, setDescription] = useState('');
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const { t, language } = useLanguage();
+
+  // ----------- Voice – Microphone for Report Issue -----------
+  const toggleMic = () => {
+    const SpeechRecognitionAPI =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang =
+      language === 'ur' ? 'ur-PK' : language === 'sd' ? 'sd' : 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results)
+        .map((r) => r[0].transcript)
+        .join('');
+      setDescription(transcript);
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
+
+  // ----------- Voice – Read Aloud for Dashboard summary -----------
+  const readAloud = () => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+
+    const summary =
+      language === 'ur'
+        ? `آپ نے 12 رپورٹیں جمع کی ہیں۔ 10 مسائل حل ہوچکے ہیں۔ آپ کے پاس 450 انعامی پوائنٹس ہیں۔ تربیتی پیشرفت 75 فیصد ہے۔`
+        : language === 'sd'
+          ? `توهان 12 رپورٽون جمع ڪيون آهن. 10 مسئلا حل ٿيا آهن. توهان وٽ 450 انعامي پوائينٽ آهن. تربيتي ترقي 75 سيڪڙو آهي.`
+          : `You have submitted 12 reports. 10 issues have been resolved. You have 450 reward points. Training progress is at 75 percent.`;
+
+    const utterance = new SpeechSynthesisUtterance(summary);
+    utterance.lang =
+      language === 'ur' ? 'ur-PK' : language === 'sd' ? 'sd' : 'en-US';
+    window.speechSynthesis.speak(utterance);
+  };
 
   const sidebarItems = [
-    { icon: <BarChart3 className="w-5 h-5" />, label: 'Dashboard', active: activeTab === 'dashboard', onClick: () => setActiveTab('dashboard') },
-    { icon: <ClipboardList className="w-5 h-5" />, label: 'Report Issue', active: activeTab === 'report', onClick: () => setActiveTab('report') },
-    { icon: <Truck className="w-5 h-5" />, label: 'Track Vehicle', active: activeTab === 'tracking', onClick: () => setActiveTab('tracking') },
-    { icon: <Bell className="w-5 h-5" />, label: 'Book Collection', active: activeTab === 'booking', onClick: () => setActiveTab('booking') },
-    { icon: <Calendar className="w-5 h-5" />, label: 'On-Demand Service', active: activeTab === 'ondemand', onClick: () => setActiveTab('ondemand') },
-    { icon: <Award className="w-5 h-5" />, label: 'Rewards', active: activeTab === 'rewards', onClick: () => setActiveTab('rewards') },
-    { icon: <GraduationCap className="w-5 h-5" />, label: 'Training', active: activeTab === 'training', onClick: () => setActiveTab('training') },
-    { icon: <MapPin className="w-5 h-5" />, label: 'Area Map', active: activeTab === 'map', onClick: () => setActiveTab('map') },
-    { icon: <Activity className="w-5 h-5" />, label: 'Analytics', active: activeTab === 'analytics', onClick: () => setActiveTab('analytics') }
+    { icon: <BarChart3 className="w-5 h-5" />, label: t('nav_dashboard'), active: activeTab === 'dashboard', onClick: () => setActiveTab('dashboard') },
+    { icon: <ClipboardList className="w-5 h-5" />, label: t('nav_report_issue'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
+    { icon: <Bell className="w-5 h-5" />, label: t('nav_book_collection'), active: activeTab === 'booking', onClick: () => setActiveTab('booking') },
+    { icon: <Calendar className="w-5 h-5" />, label: t('nav_ondemand'), active: activeTab === 'ondemand', onClick: () => setActiveTab('ondemand') },
+    { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
   ];
 
   const renderContent = () => {
@@ -49,50 +110,60 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       case 'dashboard':
         return (
           <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Citizen Dashboard</h2>
-              <p className="text-gray-600">Your waste management activities and community impact</p>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-1">{t('citizen_dashboard_title')}</h2>
+                <p className="text-gray-600">{t('citizen_dashboard_subtitle')}</p>
+              </div>
+              <button
+                onClick={readAloud}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
+                title={t('read_aloud')}
+              >
+                <Volume2 className="w-4 h-4" />
+                {t('read_aloud')}
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard
-                title="Reports Submitted"
+                title={t('stat_reports')}
                 value="12"
                 icon={<ClipboardList className="w-6 h-6" />}
-                trend={{ value: "2", isPositive: true }}
+                trend={{ value: '2', isPositive: true }}
                 color="blue"
               />
               <StatCard
-                title="Issues Resolved"
+                title={t('stat_resolved')}
                 value="10"
                 icon={<Star className="w-6 h-6" />}
-                trend={{ value: "1", isPositive: true }}
+                trend={{ value: '1', isPositive: true }}
                 color="green"
               />
               <StatCard
-                title="Reward Points"
+                title={t('stat_points')}
                 value="450"
                 icon={<Award className="w-6 h-6" />}
-                trend={{ value: "50", isPositive: true }}
+                trend={{ value: '50', isPositive: true }}
                 color="purple"
               />
               <StatCard
-                title="Training Progress"
+                title={t('stat_training')}
                 value="75%"
                 icon={<GraduationCap className="w-6 h-6" />}
-                trend={{ value: "25%", isPositive: true }}
+                trend={{ value: '25%', isPositive: true }}
                 color="yellow"
               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Recent Reports</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">{t('recent_reports')}</h3>
                 <div className="space-y-4">
                   {[
                     { id: 'R001', issue: 'Overflowing bin near park', status: 'Resolved', date: '2 days ago' },
                     { id: 'R002', issue: 'Missed garbage collection', status: 'In Progress', date: '1 day ago' },
-                    { id: 'R003', issue: 'Illegal dumping on street', status: 'Pending', date: '3 hours ago' }
+                    { id: 'R003', issue: 'Illegal dumping on street', status: 'Pending', date: '3 hours ago' },
                   ].map((report, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
@@ -113,28 +184,28 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
               </div>
 
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Garbage Collection</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">{t('garbage_collection')}</h3>
                 <div className="space-y-4">
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-2">
                       <Truck className="w-5 h-5 text-green-600" />
-                      <span className="font-semibold text-green-800">Next Collection</span>
+                      <span className="font-semibold text-green-800">{t('next_collection')}</span>
                     </div>
-                    <p className="text-green-700">Tomorrow at 8:00 AM</p>
+                    <p className="text-green-700">{t('tomorrow_8am')}</p>
                     <p className="text-sm text-green-600">Vehicle will arrive in your area</p>
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-2">
                       <Clock className="w-5 h-5 text-blue-600" />
-                      <span className="font-semibold text-blue-800">Last Collection</span>
+                      <span className="font-semibold text-blue-800">{t('last_collection')}</span>
                     </div>
-                    <p className="text-blue-700">Yesterday at 8:15 AM</p>
-                    <p className="text-sm text-blue-600">Completed successfully</p>
+                    <p className="text-blue-700">{t('yesterday_8am')}</p>
+                    <p className="text-sm text-blue-600">{t('completed_successfully')}</p>
                   </div>
 
                   <button className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-xl font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200">
-                    Book On-Demand Collection
+                    {t('book_ondemand_btn')}
                   </button>
                 </div>
               </div>
@@ -143,12 +214,12 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
             <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold mb-2">Area Cleanliness Score</h3>
-                  <p className="text-blue-100">Your neighborhood is performing well!</p>
+                  <h3 className="text-xl font-semibold mb-2">{t('area_score_title')}</h3>
+                  <p className="text-blue-100">{t('area_performing_well')}</p>
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-bold">8.5/10</div>
-                  <div className="text-blue-100">This Week</div>
+                  <div className="text-blue-100">{t('this_week')}</div>
                 </div>
               </div>
             </div>
@@ -159,67 +230,89 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
         return (
           <div className="space-y-8">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Report an Issue</h2>
-              <p className="text-gray-600">Help keep your community clean by reporting waste management issues</p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{t('report_title')}</h2>
+              <p className="text-gray-600">{t('report_subtitle')}</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <form className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Issue Type
+                    {t('issue_type')}
                   </label>
                   <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200">
-                    <option value="">Select issue type</option>
-                    <option value="overflowing">Overflowing Bin</option>
-                    <option value="missed">Missed Collection</option>
-                    <option value="illegal">Illegal Dumping</option>
-                    <option value="damaged">Damaged Bin</option>
-                    <option value="other">Other</option>
+                    <option value="">{t('select_issue_type')}</option>
+                    <option value="overflowing">{t('overflowing_bin')}</option>
+                    <option value="missed">{t('missed_collection')}</option>
+                    <option value="illegal">{t('illegal_dumping')}</option>
+                    <option value="damaged">{t('damaged_bin')}</option>
+                    <option value="other">{t('other')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Location
+                    {t('location')}
                   </label>
                   <input
                     type="text"
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
-                    placeholder="Enter location or use current location"
+                    placeholder={t('location_placeholder')}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Description
+                    {t('description')}
                   </label>
-                  <textarea
-                    rows={4}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
-                    placeholder="Describe the issue in detail"
-                  />
+                  <div className="relative">
+                    <textarea
+                      rows={4}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full px-4 py-3 pr-14 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
+                      placeholder={t('description_placeholder')}
+                    />
+                    {/* Microphone button */}
+                    <button
+                      type="button"
+                      onClick={toggleMic}
+                      title={isListening ? t('listening') : t('speak_description')}
+                      className={`absolute top-3 right-3 p-2 rounded-lg transition-all duration-200 ${isListening
+                          ? 'bg-red-100 text-red-600 animate-pulse'
+                          : 'bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                        }`}
+                    >
+                      {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {isListening && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
+                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
+                      {t('listening')}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Photo Evidence
+                    {t('photo_evidence')}
                   </label>
                   <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
                     <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 mb-2">Take a photo of the issue</p>
+                    <p className="text-gray-600 mb-2">{t('take_photo')}</p>
                     <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                      Open Camera
+                      {t('open_camera')}
                     </button>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <button type="button" className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">
-                    Save as Draft
+                    {t('save_draft')}
                   </button>
                   <button type="submit" className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-xl font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200">
-                    Submit Report
+                    {t('submit_report')}
                   </button>
                 </div>
               </form>
@@ -227,85 +320,36 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
           </div>
         );
 
-      case 'tracking':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Vehicle Tracking</h2>
-              <p className="text-gray-600">Track garbage collection vehicles in real-time</p>
-            </div>
-            <VehicleTracker userRole="citizen" />
-          </div>
-        );
-
       case 'booking':
         return (
           <div className="space-y-8">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Book Collection</h2>
-              <p className="text-gray-600">
-                Request waste collection and track your booking history
-              </p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{t('book_title')}</h2>
+              <p className="text-gray-600">{t('book_subtitle')}</p>
             </div>
 
-            {/* Booking Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Total Bookings"
-                value="145"
-                icon={<Bell className="w-6 h-6" />}
-                trend={{ value: "12%", isPositive: true }}
-                color="blue"
-              />
-              <StatCard
-                title="Completed"
-                value="132"
-                icon={<CheckCircle className="w-6 h-6" />}
-                trend={{ value: "8%", isPositive: true }}
-                color="green"
-              />
-              <StatCard
-                title="Pending"
-                value="10"
-                icon={<Clock className="w-6 h-6" />}
-                trend={{ value: "3", isPositive: false }}
-                color="yellow"
-              />
-              <StatCard
-                title="Scheduled Today"
-                value="6"
-                icon={<Calendar className="w-6 h-6" />}
-                trend={{ value: "2", isPositive: true }}
-                color="purple"
-              />
+              <StatCard title="Total Bookings" value="145" icon={<Bell className="w-6 h-6" />} trend={{ value: '12%', isPositive: true }} color="blue" />
+              <StatCard title="Completed" value="132" icon={<CheckCircle className="w-6 h-6" />} trend={{ value: '8%', isPositive: true }} color="green" />
+              <StatCard title="Pending" value="10" icon={<Clock className="w-6 h-6" />} trend={{ value: '3', isPositive: false }} color="yellow" />
+              <StatCard title="Scheduled Today" value="6" icon={<Calendar className="w-6 h-6" />} trend={{ value: '2', isPositive: true }} color="purple" />
             </div>
 
-            {/* Request Collection Form */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Request New Collection</h3>
               <form className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Address</label>
-                  <input
-                    type="text"
-                    placeholder="Enter your address"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500"
-                  />
+                  <input type="text" placeholder="Enter your address" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500"
-                    />
+                    <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
-                    <input
-                      type="time"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500"
-                    />
+                    <input type="time" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500" />
                   </div>
                 </div>
                 <div>
@@ -317,16 +361,12 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                     <option>Mixed</option>
                   </select>
                 </div>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700"
-                >
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
                   Submit Request
                 </button>
               </form>
             </div>
 
-            {/* Recent Bookings */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-lg font-semibold text-gray-900">Recent Bookings</h3>
@@ -335,11 +375,9 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Booking ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waste Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      {['Booking ID', 'Address', 'Waste Type', 'Status', 'Date'].map((h) => (
+                        <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -353,210 +391,15 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                         <td className="px-6 py-4 text-sm text-gray-500">{b.address}</td>
                         <td className="px-6 py-4 text-sm text-gray-500">{b.type}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${b.status === 'Completed'
-                                ? 'bg-green-100 text-green-800'
-                                : b.status === 'Pending'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }`}
-                          >
-                            {b.status}
-                          </span>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${b.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                              b.status === 'Pending' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>{b.status}</span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">{b.date}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'training':
-        return <TrainingSystem user={user} />;
-
-      case 'map':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Area Cleanliness Map</h2>
-              <p className="text-gray-600">View cleanliness status of different areas</p>
-            </div>
-            <HeatMap />
-          </div>
-        );
-
-      case 'analytics':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">My Analytics</h2>
-              <p className="text-gray-600">Track your environmental impact and contributions</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Reports Submitted"
-                value="12"
-                icon={<ClipboardList className="w-6 h-6" />}
-                trend={{ value: "2", isPositive: true }}
-                color="blue"
-              />
-              <StatCard
-                title="Issues Resolved"
-                value="10"
-                icon={<CheckCircle className="w-6 h-6" />}
-                trend={{ value: "1", isPositive: true }}
-                color="green"
-              />
-              <StatCard
-                title="Environmental Impact"
-                value="85 kg"
-                icon={<Globe className="w-6 h-6" />}
-                trend={{ value: "12 kg", isPositive: true }}
-                color="purple"
-              />
-              <StatCard
-                title="Community Rank"
-                value="#23"
-                icon={<Award className="w-6 h-6" />}
-                trend={{ value: "5", isPositive: true }}
-                color="yellow"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Monthly Activity</h3>
-                <div className="space-y-4">
-                  {[
-                    { month: 'January', reports: 4, resolved: 3, points: 150 },
-                    { month: 'December', reports: 3, resolved: 3, points: 120 },
-                    { month: 'November', reports: 5, resolved: 4, points: 180 }
-                  ].map((month, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{month.month}</p>
-                        <p className="text-sm text-gray-600">{month.reports} reports, {month.resolved} resolved</p>
-                      </div>
-                      <span className="font-semibold text-green-600">{month.points} pts</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Area Performance</h3>
-                <div className="space-y-4">
-                  <div className="text-center p-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-xl">
-                    <div className="text-4xl font-bold text-green-600 mb-2">8.5/10</div>
-                    <p className="text-gray-700 font-medium">Your Area Score</p>
-                    <p className="text-sm text-gray-600 mt-1">Above city average (7.8)</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Waste Collection</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div className="bg-green-500 h-2 rounded-full" style={{ width: '90%' }}></div>
-                        </div>
-                        <span className="text-sm font-semibold text-green-600">90%</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Cleanliness</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div className="bg-blue-500 h-2 rounded-full" style={{ width: '85%' }}></div>
-                        </div>
-                        <span className="text-sm font-semibold text-blue-600">85%</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Citizen Participation</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div className="bg-purple-500 h-2 rounded-full" style={{ width: '78%' }}></div>
-                        </div>
-                        <span className="text-sm font-semibold text-purple-600">78%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'rewards':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Rewards & Points</h2>
-              <p className="text-gray-600">Track your points and redeem rewards</p>
-            </div>
-
-            <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl p-8 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-2xl font-bold mb-2">Your Reward Points</h3>
-                  <p className="text-purple-100">Keep earning by reporting issues and participating!</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-4xl font-bold">450</div>
-                  <div className="text-purple-100">Total Points</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Available Rewards</h3>
-                <div className="space-y-4">
-                  {[
-                    { reward: 'Shopping Voucher ₹100', cost: '200 points', available: true },
-                    { reward: 'Movie Ticket', cost: '300 points', available: true },
-                    { reward: 'Eco-friendly Kit', cost: '500 points', available: false },
-                    { reward: 'Restaurant Voucher ₹500', cost: '800 points', available: false }
-                  ].map((reward, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{reward.reward}</p>
-                        <p className="text-sm text-gray-600">{reward.cost}</p>
-                      </div>
-                      <button
-                        className={`px-4 py-2 rounded-lg text-sm font-medium ${reward.available
-                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          }`}
-                        disabled={!reward.available}
-                      >
-                        {reward.available ? 'Redeem' : 'Locked'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">How to Earn Points</h3>
-                <div className="space-y-3">
-                  {[
-                    { activity: 'Report waste issue', points: '+25 points' },
-                    { activity: 'Complete training module', points: '+50 points' },
-                    { activity: 'Verify issue resolution', points: '+15 points' },
-                    { activity: 'Participate in cleanup', points: '+100 points' },
-                    { activity: 'Refer a friend', points: '+75 points' }
-                  ].map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-gray-700">{item.activity}</span>
-                      <span className="font-semibold text-green-600">{item.points}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
@@ -571,44 +414,18 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Bookings This Month"
-                value="8"
-                icon={<Calendar className="w-6 h-6" />}
-                trend={{ value: "2", isPositive: true }}
-                color="blue"
-              />
-              <StatCard
-                title="Completed"
-                value="6"
-                icon={<CheckCircle className="w-6 h-6" />}
-                color="green"
-              />
-              <StatCard
-                title="Avg Response Time"
-                value="45 min"
-                icon={<Clock className="w-6 h-6" />}
-                trend={{ value: "5 min", isPositive: true }}
-                color="purple"
-              />
-              <StatCard
-                title="Satisfaction"
-                value="4.8/5"
-                icon={<Star className="w-6 h-6" />}
-                trend={{ value: "0.2", isPositive: true }}
-                color="yellow"
-              />
+              <StatCard title="Bookings This Month" value="8" icon={<Calendar className="w-6 h-6" />} trend={{ value: '2', isPositive: true }} color="blue" />
+              <StatCard title="Completed" value="6" icon={<CheckCircle className="w-6 h-6" />} color="green" />
+              <StatCard title="Avg Response Time" value="45 min" icon={<Clock className="w-6 h-6" />} trend={{ value: '5 min', isPositive: true }} color="purple" />
+              <StatCard title="Satisfaction" value="4.8/5" icon={<Star className="w-6 h-6" />} trend={{ value: '0.2', isPositive: true }} color="yellow" />
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">Book Collection Service</h3>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Service Type
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Service Type</label>
                     <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200">
                       <option value="">Select service type</option>
                       <option value="bulk">Bulk Waste Collection</option>
@@ -618,121 +435,66 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                       <option value="construction">Construction Debris</option>
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Collection Time
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Collection Time</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <button className="p-3 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all duration-200">
+                      <button type="button" className="p-3 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all duration-200">
                         <Zap className="w-6 h-6 text-green-500 mx-auto mb-1" />
                         <span className="text-sm font-medium">Immediate</span>
                       </button>
-                      <button className="p-3 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200">
+                      <button type="button" className="p-3 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200">
                         <Calendar className="w-6 h-6 text-blue-500 mx-auto mb-1" />
                         <span className="text-sm font-medium">Schedule</span>
                       </button>
                     </div>
                   </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Pickup Address
-                    </label>
-                    <textarea
-                      rows={3}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
-                      placeholder="Enter your complete address"
-                    />
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Pickup Address</label>
+                    <textarea rows={3} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200" placeholder="Enter your complete address" />
                   </div>
-
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Upload Photo (Optional)
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Upload Photo (Optional)</label>
                     <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
                       <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-600 mb-2">Take a photo of the waste</p>
-                      <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                        Open Camera
-                      </button>
+                      <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">Open Camera</button>
                     </div>
                   </div>
                 </div>
-
                 <div className="space-y-6">
                   <div className="bg-blue-50 rounded-xl p-6">
                     <h4 className="font-semibold text-blue-900 mb-3">Service Information</h4>
                     <ul className="text-sm text-blue-800 space-y-2">
-                      <li>• Immediate service: 30-60 minutes</li>
+                      <li>• Immediate service: 30–60 minutes</li>
                       <li>• Scheduled service: Choose your preferred time</li>
                       <li>• Photo helps us prepare the right equipment</li>
                       <li>• Service charges apply based on waste type</li>
                     </ul>
                   </div>
-
                   <div className="bg-green-50 rounded-xl p-6">
                     <h4 className="font-semibold text-green-900 mb-3">Estimated Cost</h4>
                     <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-green-800">Base Service Fee:</span>
-                        <span className="font-semibold text-green-900">₹50</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-green-800">Waste Type Fee:</span>
-                        <span className="font-semibold text-green-900">₹30</span>
-                      </div>
-                      <div className="border-t border-green-200 pt-2 flex justify-between">
-                        <span className="font-semibold text-green-900">Total:</span>
-                        <span className="font-bold text-green-900">₹80</span>
-                      </div>
+                      <div className="flex justify-between"><span className="text-green-800">Base Service Fee:</span><span className="font-semibold text-green-900">₹50</span></div>
+                      <div className="flex justify-between"><span className="text-green-800">Waste Type Fee:</span><span className="font-semibold text-green-900">₹30</span></div>
+                      <div className="border-t border-green-200 pt-2 flex justify-between"><span className="font-semibold text-green-900">Total:</span><span className="font-bold text-green-900">₹80</span></div>
                     </div>
                   </div>
-
                   <button className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl">
                     Book Collection Service
                   </button>
                 </div>
               </div>
             </div>
-
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Bookings</h3>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {[
-                    { id: 'OD001', type: 'Bulk Waste', date: '2024-01-15', status: 'Completed', cost: '₹120' },
-                    { id: 'OD002', type: 'E-Waste', date: '2024-01-12', status: 'Completed', cost: '₹80' },
-                    { id: 'OD003', type: 'Garden Waste', date: '2024-01-10', status: 'In Progress', cost: '₹60' }
-                  ].map((booking, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{booking.id} - {booking.type}</p>
-                        <p className="text-sm text-gray-500">Booked on {booking.date}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${booking.status === 'Completed'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                          {booking.status}
-                        </span>
-                        <p className="text-sm font-medium text-gray-900 mt-1">{booking.cost}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
         );
+
+      case 'training':
+        return <TrainingSystem user={user} />;
 
       default:
         return (
           <div className="text-center py-12">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Feature Coming Soon</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('coming_soon')}</h3>
             <p className="text-gray-600">This feature is under development</p>
           </div>
         );
