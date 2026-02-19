@@ -15,6 +15,9 @@ import {
   Mic,
   MicOff,
   Volume2,
+  MapPin,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { User } from '../../App';
 import Layout from '../common/Layout';
@@ -27,11 +30,23 @@ interface CitizenDashboardProps {
   onLogout: () => void;
 }
 
-// Extend EventTarget for webkit speech recognition
+// Self-contained Speech Recognition type shim (avoids needing @types/dom-speech-recognition)
+interface ISpeechRecognitionResult { readonly length: number;[index: number]: { transcript: string } }
+interface ISpeechRecognitionEvent { readonly results: ISpeechRecognitionResult[] }
+interface ISpeechRecognition {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: ISpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
 declare global {
   interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
   }
 }
 
@@ -39,8 +54,106 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isListening, setIsListening] = useState(false);
   const [description, setDescription] = useState('');
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const { t, language } = useLanguage();
+
+  // ----------- Multi-photo state -----------
+  interface GeoPhoto {
+    file: File;
+    preview: string;
+    lat?: number;
+    lng?: number;
+    address?: string;
+    geoLoading?: boolean;
+  }
+  const [photos, setPhotos] = useState<GeoPhoto[]>([]);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  // Capture GPS coords silently when a photo is added
+  const captureGpsForPhoto = (index: number) => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        let address = `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+          );
+          const data = await res.json();
+          if (data.display_name) address = data.display_name;
+        } catch { /* fallback to coords */ }
+        setPhotos((prev) =>
+          prev.map((p, i) =>
+            i === index
+              ? { ...p, lat: coords.latitude, lng: coords.longitude, address, geoLoading: false }
+              : p
+          )
+        );
+      },
+      () => {
+        // GPS denied — mark as done without coords
+        setPhotos((prev) =>
+          prev.map((p, i) => (i === index ? { ...p, geoLoading: false } : p))
+        );
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 5 - photos.length;
+    const startIndex = photos.length;
+    const toAdd: GeoPhoto[] = files.slice(0, remaining).map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+      geoLoading: true,
+    }));
+    setPhotos((prev) => [...prev, ...toAdd]);
+    // Capture GPS for each new photo
+    toAdd.forEach((_, i) => captureGpsForPhoto(startIndex + i));
+    e.target.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // ----------- GPS location state -----------
+  const [location, setLocation] = useState('');
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  const fetchLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+          );
+          const data = await res.json();
+          setLocation(data.display_name || `${coords.latitude}, ${coords.longitude}`);
+        } catch {
+          setLocation(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      () => {
+        alert('Unable to fetch location. Please allow location access.');
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // ----------- Voice – Microphone for Report Issue -----------
   const toggleMic = () => {
@@ -64,8 +177,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     recognition.interimResults = true;
     recognition.continuous = false;
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = Array.from(event.results)
+    recognition.onresult = (event: ISpeechRecognitionEvent) => {
+      const transcript = event.results
         .map((r) => r[0].transcript)
         .join('');
       setDescription(transcript);
@@ -171,10 +284,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                         <p className="text-sm text-gray-500">{report.id} • {report.date}</p>
                       </div>
                       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${report.status === 'Resolved'
-                          ? 'bg-green-100 text-green-800'
-                          : report.status === 'In Progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
+                        ? 'bg-green-100 text-green-800'
+                        : report.status === 'In Progress'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
                         }`}>
                         {report.status}
                       </span>
@@ -254,11 +367,29 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     {t('location')}
                   </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
-                    placeholder={t('location_placeholder')}
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
+                      placeholder={t('location_placeholder')}
+                    />
+                    <button
+                      type="button"
+                      onClick={fetchLocation}
+                      disabled={locationLoading}
+                      title="Use my current location"
+                      className="flex items-center gap-2 px-4 py-3 bg-green-50 border-2 border-green-200 text-green-700 rounded-xl hover:bg-green-100 transition-colors disabled:opacity-60"
+                    >
+                      {locationLoading
+                        ? <Loader2 className="w-5 h-5 animate-spin" />
+                        : <MapPin className="w-5 h-5" />}
+                      <span className="text-sm font-medium hidden sm:inline">
+                        {locationLoading ? 'Fetching…' : 'Auto-detect'}
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -279,8 +410,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                       onClick={toggleMic}
                       title={isListening ? t('listening') : t('speak_description')}
                       className={`absolute top-3 right-3 p-2 rounded-lg transition-all duration-200 ${isListening
-                          ? 'bg-red-100 text-red-600 animate-pulse'
-                          : 'bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700'
+                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        : 'bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700'
                         }`}
                     >
                       {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -297,14 +428,92 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     {t('photo_evidence')}
+                    <span className="ml-2 text-xs font-normal text-gray-400">({photos.length}/5)</span>
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
-                    <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 mb-2">{t('take_photo')}</p>
-                    <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                      {t('open_camera')}
-                    </button>
-                  </div>
+
+                  {/* Photo preview grid */}
+                  {photos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                      {photos.map((p, i) => (
+                        <div key={i} className="relative group">
+                          <img
+                            src={p.preview}
+                            alt={`Photo ${i + 1}`}
+                            className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                          />
+                          {/* Remove button */}
+                          <button
+                            type="button"
+                            onClick={() => removePhoto(i)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {/* Geo-tag badge */}
+                          {p.geoLoading ? (
+                            <div className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-black/60 text-white text-[9px] font-medium px-1 py-0.5 rounded">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              <span>GPS…</span>
+                            </div>
+                          ) : p.lat ? (
+                            <div
+                              className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-green-600/90 text-white text-[9px] font-medium px-1 py-0.5 rounded cursor-help max-w-[95%] overflow-hidden"
+                              title={p.address || `${p.lat?.toFixed(5)}, ${p.lng?.toFixed(5)}`}
+                            >
+                              <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                              <span className="truncate">{p.lat.toFixed(4)}, {p.lng?.toFixed(4)}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload buttons */}
+                  {photos.length < 5 && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center">
+                      <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-600 mb-1">{t('take_photo')}</p>
+                      <p className="text-xs text-gray-400 mb-4">Each photo is automatically geo-tagged with your GPS location</p>
+                      <div className="flex gap-3 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => cameraInputRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                        >
+                          <Camera className="w-4 h-4" />
+                          Camera
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => galleryInputRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                        >
+                          <span>🖼️</span>
+                          Gallery
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Camera input – one photo at a time from camera */}
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
+                  {/* Gallery input – multiple photos from library */}
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                  />
                 </div>
 
                 <div className="flex gap-4">
@@ -392,7 +601,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                         <td className="px-6 py-4 text-sm text-gray-500">{b.type}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${b.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                              b.status === 'Pending' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                            b.status === 'Pending' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                             }`}>{b.status}</span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">{b.date}</td>

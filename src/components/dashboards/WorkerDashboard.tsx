@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   ClipboardList,
   Camera,
@@ -8,11 +8,12 @@ import {
   Globe,
   BarChart3,
   Clock,
-  Mic,
   Target,
   Zap,
   Users,
   MapPin,
+  X,
+  Loader2,
 } from 'lucide-react';
 
 import { User } from '../../App';
@@ -27,6 +28,69 @@ interface WorkerDashboardProps {
 
 const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('tasks');
+
+  // ----------- Geo-tagged proof photos -----------
+  interface GeoPhoto {
+    file: File;
+    preview: string;
+    lat?: number;
+    lng?: number;
+    address?: string;
+    geoLoading?: boolean;
+  }
+  const [proofPhotos, setProofPhotos] = useState<GeoPhoto[]>([]);
+  const proofCameraInputRef = useRef<HTMLInputElement>(null);
+  const proofGalleryInputRef = useRef<HTMLInputElement>(null);
+
+  const captureGpsForProof = (index: number) => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        let address = `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+          );
+          const data = await res.json();
+          if (data.display_name) address = data.display_name;
+        } catch { /* fallback */ }
+        setProofPhotos((prev) =>
+          prev.map((p, i) =>
+            i === index
+              ? { ...p, lat: coords.latitude, lng: coords.longitude, address, geoLoading: false }
+              : p
+          )
+        );
+      },
+      () => {
+        setProofPhotos((prev) =>
+          prev.map((p, i) => (i === index ? { ...p, geoLoading: false } : p))
+        );
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  const handleProofPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 5 - proofPhotos.length;
+    const startIndex = proofPhotos.length;
+    const toAdd: GeoPhoto[] = files.slice(0, remaining).map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+      geoLoading: true,
+    }));
+    setProofPhotos((prev) => [...prev, ...toAdd]);
+    toAdd.forEach((_, i) => captureGpsForProof(startIndex + i));
+    e.target.value = '';
+  };
+
+  const removeProofPhoto = (index: number) => {
+    setProofPhotos((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
 
   const sidebarItems = [
     { icon: <ClipboardList className="w-5 h-5" />, label: 'My Tasks', active: activeTab === 'tasks', onClick: () => setActiveTab('tasks') },
@@ -71,11 +135,11 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-gray-900">{task.id}</span>
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                              task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                            task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
                             }`}>{task.priority}</span>
                         </div>
                         <span className={`px-3 py-1 text-sm font-semibold rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                            task.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                          task.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                           }`}>{task.status}</span>
                       </div>
                       <div className="mb-3">
@@ -112,16 +176,97 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">Current Task: Main Square - Bin #78</h3>
               <div className="space-y-6">
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
-                  <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h4 className="text-lg font-semibold text-gray-900 mb-2">Take Photo</h4>
-                  <p className="text-gray-600 mb-4">Capture a geo-tagged photo of the completed work</p>
-                  <div className="flex gap-3 justify-center">
-                    <button className="bg-green-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-green-600 transition-colors">Open Camera</button>
-                    <button className="bg-blue-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-600 transition-colors flex items-center gap-2">
-                      <Mic className="w-5 h-5" />Voice Note
-                    </button>
-                  </div>
+
+                {/* Geo-tagged photo upload */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Proof Photos
+                    <span className="ml-2 text-xs font-normal text-gray-400">({proofPhotos.length}/5)</span>
+                  </label>
+
+                  {/* Thumbnail grid */}
+                  {proofPhotos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                      {proofPhotos.map((p, i) => (
+                        <div key={i} className="relative group">
+                          <img
+                            src={p.preview}
+                            alt={`Proof ${i + 1}`}
+                            className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                          />
+                          {/* Remove */}
+                          <button
+                            type="button"
+                            onClick={() => removeProofPhoto(i)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {/* Geo-tag badge */}
+                          {p.geoLoading ? (
+                            <div className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-black/60 text-white text-[9px] font-medium px-1 py-0.5 rounded">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              <span>GPS…</span>
+                            </div>
+                          ) : p.lat ? (
+                            <div
+                              className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-green-600/90 text-white text-[9px] font-medium px-1 py-0.5 rounded cursor-help max-w-[95%] overflow-hidden"
+                              title={p.address || `${p.lat.toFixed(5)}, ${p.lng?.toFixed(5)}`}
+                            >
+                              <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                              <span className="truncate">{p.lat.toFixed(4)}, {p.lng?.toFixed(4)}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload buttons */}
+                  {proofPhotos.length < 5 && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                      <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                      <h4 className="text-lg font-semibold text-gray-900 mb-1">Geo-Tagged Proof Photo</h4>
+                      <p className="text-gray-500 text-sm mb-4">GPS coordinates are automatically embedded when you capture a photo</p>
+                      <div className="flex gap-3 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => proofCameraInputRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                        >
+                          <Camera className="w-4 h-4" />
+                          Camera
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => proofGalleryInputRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                        >
+                          <span>🖼️</span>
+                          Gallery
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Camera: one photo at a time */}
+                  <input
+                    ref={proofCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleProofPhotoChange}
+                  />
+                  {/* Gallery: multiple from library */}
+                  <input
+                    ref={proofGalleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleProofPhotoChange}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -147,7 +292,12 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
 
                 <div className="flex gap-4">
                   <button className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">Save as Draft</button>
-                  <button className="flex-1 bg-green-500 text-white py-3 rounded-xl font-medium hover:bg-green-600 transition-colors">Submit Completion</button>
+                  <button
+                    className="flex-1 bg-green-500 text-white py-3 rounded-xl font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
+                    disabled={proofPhotos.length === 0}
+                  >
+                    Submit Completion ({proofPhotos.filter(p => p.lat).length} geo-tagged)
+                  </button>
                 </div>
               </div>
             </div>
