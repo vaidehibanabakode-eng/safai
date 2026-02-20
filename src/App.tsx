@@ -8,6 +8,7 @@ import AdminDashboard from './components/dashboards/AdminDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
 import CitizenDashboard from './components/dashboards/CitizenDashboard';
 import { ThemeProvider } from './contexts/ThemeContext';
+import app from "./firebase";
 // import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export type UserRole = 'superadmin' | 'admin' | 'green-champion' | 'worker' | 'citizen';
