@@ -78,7 +78,12 @@ const WorkersTab: React.FC = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{worker.tasks}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{worker.performance}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button className="text-indigo-600 hover:text-indigo-900 mr-4 transition-colors">View</button>
+                                        <button
+                                            onClick={() => alert(`Opening ${worker.name}'s profile...`)}
+                                            className="text-indigo-600 hover:text-indigo-900 mr-4 transition-colors"
+                                        >
+                                            View
+                                        </button>
                                         <button className="text-green-600 hover:text-green-900 transition-colors">Assign Task</button>
                                     </td>
                                 </tr>

@@ -1,29 +1,33 @@
 import React, { useState, useRef } from 'react';
 import {
   ClipboardList,
-  Truck,
-  Bell,
   Calendar,
   GraduationCap,
-  BarChart3,
   Camera,
   Clock,
   CheckCircle,
-  Zap,
   Star,
-  Award,
   Mic,
   MicOff,
   Volume2,
   MapPin,
   X,
   Loader2,
+  UserCircle,
+  LayoutDashboard,
+  AlertTriangle,
+  History,
+  Settings,
+  ChevronRight,
 } from 'lucide-react';
 import { User } from '../../App';
 import Layout from '../common/Layout';
 import StatCard from '../common/StatCard';
 import TrainingSystem from '../training/TrainingSystem';
+import ProfilePage from '../common/ProfilePage';
 import { useLanguage } from '../../contexts/LanguageContext';
+import SettingsTab from './tabs/SettingsTab';
+
 
 interface CitizenDashboardProps {
   user: User;
@@ -51,7 +55,7 @@ declare global {
 }
 
 const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('home'); // Changed default to 'home' to match new key
   const [isListening, setIsListening] = useState(false);
   const [description, setDescription] = useState('');
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
@@ -199,10 +203,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
 
     const summary =
       language === 'ur'
-        ? `آپ نے 12 رپورٹیں جمع کی ہیں۔ 10 مسائل حل ہوچکے ہیں۔ آپ کے پاس 450 انعامی پوائنٹس ہیں۔ تربیتی پیشرفت 75 فیصد ہے۔`
+        ? `آپ نے 12 رپورٹیں جمع کی ہیں۔ 10 مسائل حل ہوچکے ہیں۔ ٹریننگ پروگریس 75 فیصد ہے۔`
         : language === 'sd'
-          ? `توهان 12 رپورٽون جمع ڪيون آهن. 10 مسئلا حل ٿيا آهن. توهان وٽ 450 انعامي پوائينٽ آهن. تربيتي ترقي 75 سيڪڙو آهي.`
-          : `You have submitted 12 reports. 10 issues have been resolved. You have 450 reward points. Training progress is at 75 percent.`;
+          ? `توهان 12 رپورٽون جمع ڪيون آهن. 10 مسئلا حل ٿيا آهن. ٽريننگ پروگريس 75 سيڪڙو آهي.`
+          : `You have submitted 12 reports. 10 issues have been resolved. Training progress is at 75 percent.`;
 
     const utterance = new SpeechSynthesisUtterance(summary);
     utterance.lang =
@@ -211,16 +215,17 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
   };
 
   const sidebarItems = [
-    { icon: <BarChart3 className="w-5 h-5" />, label: t('nav_dashboard'), active: activeTab === 'dashboard', onClick: () => setActiveTab('dashboard') },
-    { icon: <ClipboardList className="w-5 h-5" />, label: t('nav_report_issue'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
-    { icon: <Bell className="w-5 h-5" />, label: t('nav_book_collection'), active: activeTab === 'booking', onClick: () => setActiveTab('booking') },
-    { icon: <Calendar className="w-5 h-5" />, label: t('nav_ondemand'), active: activeTab === 'ondemand', onClick: () => setActiveTab('ondemand') },
-    { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
+    { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_education'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
+    { icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav_home'), active: activeTab === 'home', onClick: () => setActiveTab('home') },
+    { icon: <AlertTriangle className="w-5 h-5" />, label: t('nav_report'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
+    { icon: <History className="w-5 h-5" />, label: t('nav_track'), active: activeTab === 'track', onClick: () => setActiveTab('track') },
+    { icon: <Settings className="w-5 h-5" />, label: t('settings'), active: activeTab === 'settings', onClick: () => setActiveTab('settings') },
+    { icon: <UserCircle className="w-5 h-5" />, label: t('profile'), active: activeTab === 'profile', onClick: () => setActiveTab('profile') },
   ];
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
+      case 'home':
         return (
           <div className="space-y-8">
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -238,7 +243,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <StatCard
                 title={t('stat_reports')}
                 value="12"
@@ -254,13 +259,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                 color="green"
               />
               <StatCard
-                title={t('stat_points')}
-                value="450"
-                icon={<Award className="w-6 h-6" />}
-                trend={{ value: '50', isPositive: true }}
-                color="purple"
-              />
-              <StatCard
                 title={t('stat_training')}
                 value="75%"
                 icon={<GraduationCap className="w-6 h-6" />}
@@ -269,58 +267,37 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">{t('recent_reports')}</h3>
-                <div className="space-y-4">
-                  {[
-                    { id: 'R001', issue: 'Overflowing bin near park', status: 'Resolved', date: '2 days ago' },
-                    { id: 'R002', issue: 'Missed garbage collection', status: 'In Progress', date: '1 day ago' },
-                    { id: 'R003', issue: 'Illegal dumping on street', status: 'Pending', date: '3 hours ago' },
-                  ].map((report, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{report.issue}</p>
-                        <p className="text-sm text-gray-500">{report.id} • {report.date}</p>
-                      </div>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${report.status === 'Resolved'
-                        ? 'bg-green-100 text-green-800'
-                        : report.status === 'In Progress'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                        }`}>
-                        {report.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900">{t('recent_reports')}</h3>
+                <button
+                  onClick={() => setActiveTab('track')}
+                  className="text-green-600 hover:text-green-700 text-sm font-medium"
+                >
+                  View All
+                </button>
               </div>
-
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">{t('garbage_collection')}</h3>
-                <div className="space-y-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Truck className="w-5 h-5 text-green-600" />
-                      <span className="font-semibold text-green-800">{t('next_collection')}</span>
+              <div className="space-y-4">
+                {[
+                  { id: 'R001', issue: 'Overflowing bin near park', status: 'Resolved', date: '2 days ago' },
+                  { id: 'R002', issue: 'Missed garbage collection', status: 'In Progress', date: '1 day ago' },
+                  { id: 'R003', issue: 'Illegal dumping on street', status: 'Pending', date: '3 hours ago' },
+                ].map((report, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div>
+                      <p className="font-medium text-gray-900">{report.issue}</p>
+                      <p className="text-sm text-gray-500">{report.id} • {report.date}</p>
                     </div>
-                    <p className="text-green-700">{t('tomorrow_8am')}</p>
-                    <p className="text-sm text-green-600">Vehicle will arrive in your area</p>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${report.status === 'Resolved'
+                      ? 'bg-green-100 text-green-800'
+                      : report.status === 'In Progress'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-red-100 text-red-800'
+                      }`}>
+                      {report.status}
+                    </span>
                   </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Clock className="w-5 h-5 text-blue-600" />
-                      <span className="font-semibold text-blue-800">{t('last_collection')}</span>
-                    </div>
-                    <p className="text-blue-700">{t('yesterday_8am')}</p>
-                    <p className="text-sm text-blue-600">{t('completed_successfully')}</p>
-                  </div>
-
-                  <button className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-xl font-medium hover:from-green-600 hover:to-green-700 transition-all duration-200">
-                    {t('book_ondemand_btn')}
-                  </button>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -529,169 +506,61 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
           </div>
         );
 
-      case 'booking':
+      case 'track':
         return (
           <div className="space-y-8">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">{t('book_title')}</h2>
-              <p className="text-gray-600">{t('book_subtitle')}</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard title="Total Bookings" value="145" icon={<Bell className="w-6 h-6" />} trend={{ value: '12%', isPositive: true }} color="blue" />
-              <StatCard title="Completed" value="132" icon={<CheckCircle className="w-6 h-6" />} trend={{ value: '8%', isPositive: true }} color="green" />
-              <StatCard title="Pending" value="10" icon={<Clock className="w-6 h-6" />} trend={{ value: '3', isPositive: false }} color="yellow" />
-              <StatCard title="Scheduled Today" value="6" icon={<Calendar className="w-6 h-6" />} trend={{ value: '2', isPositive: true }} color="purple" />
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Request New Collection</h3>
-              <form className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pickup Address</label>
-                  <input type="text" placeholder="Enter your address" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
-                    <input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Time</label>
-                    <input type="time" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500" />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type of Waste</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring focus:ring-blue-200 focus:border-blue-500">
-                    <option>Organic</option>
-                    <option>Recyclable</option>
-                    <option>Hazardous</option>
-                    <option>Mixed</option>
-                  </select>
-                </div>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
-                  Submit Request
-                </button>
-              </form>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{t('nav_track')}</h2>
+              <p className="text-gray-600">Monitor the status of your reported issues</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg font-semibold text-gray-900">Recent Bookings</h3>
+              <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-900">Your Reports</h3>
+                <div className="flex gap-2">
+                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">10 Resolved</span>
+                  <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">2 In Progress</span>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {['Booking ID', 'Address', 'Waste Type', 'Status', 'Date'].map((h) => (
-                        <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {[
-                      { id: 'B001', address: '12 Market Rd, Ward 8', type: 'Organic', status: 'Completed', date: '2025-09-25' },
-                      { id: 'B002', address: '44 Green Park, Ward 12', type: 'Recyclable', status: 'Pending', date: '2025-09-24' },
-                      { id: 'B003', address: '88 Industrial Zone C', type: 'Hazardous', status: 'Scheduled', date: '2025-09-23' },
-                    ].map((b, i) => (
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{b.id}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{b.address}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{b.type}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${b.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                            b.status === 'Pending' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>{b.status}</span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{b.date}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'ondemand':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">On-Demand Collection</h2>
-              <p className="text-gray-600">Book immediate or scheduled waste collection services</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard title="Bookings This Month" value="8" icon={<Calendar className="w-6 h-6" />} trend={{ value: '2', isPositive: true }} color="blue" />
-              <StatCard title="Completed" value="6" icon={<CheckCircle className="w-6 h-6" />} color="green" />
-              <StatCard title="Avg Response Time" value="45 min" icon={<Clock className="w-6 h-6" />} trend={{ value: '5 min', isPositive: true }} color="purple" />
-              <StatCard title="Satisfaction" value="4.8/5" icon={<Star className="w-6 h-6" />} trend={{ value: '0.2', isPositive: true }} color="yellow" />
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Book Collection Service</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Service Type</label>
-                    <select className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200">
-                      <option value="">Select service type</option>
-                      <option value="bulk">Bulk Waste Collection</option>
-                      <option value="hazardous">Hazardous Waste</option>
-                      <option value="electronic">E-Waste</option>
-                      <option value="garden">Garden Waste</option>
-                      <option value="construction">Construction Debris</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Collection Time</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button type="button" className="p-3 border-2 border-gray-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all duration-200">
-                        <Zap className="w-6 h-6 text-green-500 mx-auto mb-1" />
-                        <span className="text-sm font-medium">Immediate</span>
-                      </button>
-                      <button type="button" className="p-3 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all duration-200">
-                        <Calendar className="w-6 h-6 text-blue-500 mx-auto mb-1" />
-                        <span className="text-sm font-medium">Schedule</span>
+              <div className="divide-y divide-gray-200">
+                {[
+                  { id: 'R001', issue: 'Overflowing bin near park', status: 'Resolved', date: '2 days ago', location: 'Central Park West Gate' },
+                  { id: 'R002', issue: 'Missed garbage collection', status: 'In Progress', date: '1 day ago', location: '12 Market Street' },
+                  { id: 'R003', issue: 'Illegal dumping on street', status: 'Pending', date: '3 hours ago', location: 'Industrial Area Zone 4' },
+                  { id: 'R004', issue: 'Damaged street bin', status: 'Resolved', date: '1 week ago', location: 'Main Square' },
+                  { id: 'R005', issue: 'Hazardous waste found', status: 'Resolved', date: '2 weeks ago', location: 'River Bank' },
+                ].map((report, index) => (
+                  <div key={index} className="p-4 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-xl flex-shrink-0 ${report.status === 'Resolved' ? 'bg-green-100 text-green-600' : report.status === 'In Progress' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'}`}>
+                        {report.status === 'Resolved' ? <CheckCircle className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{report.issue}</h4>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                          <span className="font-medium">#{report.id}</span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {report.date}</span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {report.location}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 self-end sm:self-center">
+                      <span className={`px-3 py-1 text-sm font-semibold rounded-full ${report.status === 'Resolved'
+                        ? 'bg-green-100 text-green-800'
+                        : report.status === 'In Progress'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                        }`}>
+                        {report.status}
+                      </span>
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <ChevronRight className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Pickup Address</label>
-                    <textarea rows={3} className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200" placeholder="Enter your complete address" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Upload Photo (Optional)</label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
-                      <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-600 mb-2">Take a photo of the waste</p>
-                      <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">Open Camera</button>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-6">
-                  <div className="bg-blue-50 rounded-xl p-6">
-                    <h4 className="font-semibold text-blue-900 mb-3">Service Information</h4>
-                    <ul className="text-sm text-blue-800 space-y-2">
-                      <li>• Immediate service: 30–60 minutes</li>
-                      <li>• Scheduled service: Choose your preferred time</li>
-                      <li>• Photo helps us prepare the right equipment</li>
-                      <li>• Service charges apply based on waste type</li>
-                    </ul>
-                  </div>
-                  <div className="bg-green-50 rounded-xl p-6">
-                    <h4 className="font-semibold text-green-900 mb-3">Estimated Cost</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between"><span className="text-green-800">Base Service Fee:</span><span className="font-semibold text-green-900">₹50</span></div>
-                      <div className="flex justify-between"><span className="text-green-800">Waste Type Fee:</span><span className="font-semibold text-green-900">₹30</span></div>
-                      <div className="border-t border-green-200 pt-2 flex justify-between"><span className="font-semibold text-green-900">Total:</span><span className="font-bold text-green-900">₹80</span></div>
-                    </div>
-                  </div>
-                  <button className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl">
-                    Book Collection Service
-                  </button>
-                </div>
+                ))}
               </div>
             </div>
           </div>
@@ -699,6 +568,9 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
 
       case 'training':
         return <TrainingSystem user={user} />;
+      case 'settings': return <SettingsTab />;
+      case 'profile':
+        return <ProfilePage user={user} />;
 
       default:
         return (
@@ -711,7 +583,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
   };
 
   return (
-    <Layout user={user} onLogout={onLogout} sidebarItems={sidebarItems}>
+    <Layout user={user} onLogout={onLogout} sidebarItems={sidebarItems} onProfileClick={() => setActiveTab('profile')}>
       {renderContent()}
     </Layout>
   );

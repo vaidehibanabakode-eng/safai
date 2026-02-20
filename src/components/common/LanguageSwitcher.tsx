@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Globe } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { Locale } from '../../i18n/translations';
 
-const LOCALES: { code: Locale; label: string; nativeLabel: string }[] = [
+const LOCALES: { code: string; label: string; nativeLabel: string }[] = [
     { code: 'en', label: 'English', nativeLabel: 'English' },
-    { code: 'ur', label: 'Urdu', nativeLabel: 'اردو' },
-    { code: 'sd', label: 'Sindhi', nativeLabel: 'سنڌي' },
+    { code: 'hi', label: 'Hindi', nativeLabel: 'हिंदी' },
 ];
 
 const LanguageSwitcher: React.FC = () => {

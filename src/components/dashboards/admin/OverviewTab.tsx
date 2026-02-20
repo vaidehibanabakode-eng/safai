@@ -10,7 +10,15 @@ import {
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 
-const OverviewTab: React.FC = () => {
+interface OverviewTabProps {
+    onNavigate: (tab: string) => void;
+}
+
+const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
+    const handleResolve = (item: string) => {
+        alert(`Resolving: ${item}\n\nThis action would normally assign a worker or update the status.`);
+    };
+
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="flex justify-between items-center">
@@ -25,8 +33,8 @@ const OverviewTab: React.FC = () => {
                 </div>
             </div>
 
-            {/* Key Metrics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Key Metrics Row - 2 Columns now */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <StatCard
                     title="Total Complaints"
                     value="1,247"
@@ -41,20 +49,6 @@ const OverviewTab: React.FC = () => {
                     trend={{ value: "94% Attendance", isPositive: true }}
                     color="blue"
                 />
-                <StatCard
-                    title="Revenue (Month)"
-                    value="₹1.25L"
-                    icon={<TrendingUp className="w-6 h-6" />}
-                    trend={{ value: "8% vs last mo", isPositive: true }}
-                    color="green"
-                />
-                <StatCard
-                    title="Efficiency Score"
-                    value="92%"
-                    icon={<BarChart3 className="w-6 h-6" />}
-                    trend={{ value: "+2.4%", isPositive: true }}
-                    color="purple"
-                />
             </div>
 
             {/* Secondary Metrics & Quick Actions */}
@@ -63,7 +57,12 @@ const OverviewTab: React.FC = () => {
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                         <h3 className="text-lg font-semibold text-gray-900">Priority Actions</h3>
-                        <button className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">View All</button>
+                        <button
+                            onClick={() => onNavigate('complaints')}
+                            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                            View All
+                        </button>
                     </div>
                     <div className="divide-y divide-gray-100">
                         {[
@@ -79,7 +78,10 @@ const OverviewTab: React.FC = () => {
                                         <p className="text-sm text-gray-500">{item.time} • {item.type}</p>
                                     </div>
                                 </div>
-                                <button className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600">
+                                <button
+                                    onClick={() => handleResolve(item.title)}
+                                    className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-100 text-gray-600 transition-colors"
+                                >
                                     Resolve
                                 </button>
                             </div>

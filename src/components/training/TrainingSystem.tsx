@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Play, 
-  Trophy, 
-  Star, 
-  Clock, 
-  CheckCircle, 
+import {
+  Play,
+  Trophy,
+  Star,
+  Clock,
+  CheckCircle,
   Lock,
   Heart,
   Award,
   Target,
   BookOpen,
   Download,
-  Share2
+  Share2,
+  Video
 } from 'lucide-react';
 import { User } from '../../App';
+import LanguageSwitcher from '../common/LanguageSwitcher';
 import { TRAINING_MODULES, TrainingModule, Exercise } from '../../data/trainingModules';
 
 interface TrainingSystemProps {
@@ -40,6 +42,7 @@ interface ExerciseState {
   hearts: number;
   selectedAnswer: any;
   matchingState: any;
+  videoWatched: boolean;
 }
 
 const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
@@ -62,11 +65,11 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
     score: 0,
     hearts: 5,
     selectedAnswer: null,
-    matchingState: null
+    matchingState: null,
+    videoWatched: false
   });
 
   const [showExercise, setShowExercise] = useState(false);
-  const [showCompletion, setShowCompletion] = useState(false);
 
   const modules = TRAINING_MODULES[user.role] || [];
 
@@ -110,18 +113,22 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
       score: 0,
       hearts: userProgress.hearts,
       selectedAnswer: null,
-      matchingState: null
+      matchingState: null,
+      videoWatched: false
     });
     setShowExercise(true);
   };
 
   const submitAnswer = () => {
-    const { currentExercise, selectedAnswer } = exerciseState;
+    const { currentExercise, selectedAnswer, videoWatched } = exerciseState;
     if (!currentExercise) return;
 
     let isCorrect = false;
-    
+
     switch (currentExercise.type) {
+      case 'video-lecture':
+        isCorrect = videoWatched;
+        break;
       case 'multiple-choice':
       case 'scenario':
         isCorrect = selectedAnswer === currentExercise.correctAnswer;
@@ -138,7 +145,7 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
 
   const processAnswer = (isCorrect: boolean) => {
     const newState = { ...exerciseState };
-    
+
     if (isCorrect) {
       newState.score += exerciseState.currentExercise?.points || 10;
     } else {
@@ -152,20 +159,21 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
 
     // Move to next exercise
     newState.exerciseIndex++;
-    
+
     if (newState.exerciseIndex >= (exerciseState.currentModule?.exercises.length || 0)) {
       // Module completed
       completeModule(newState.score);
     } else {
       newState.currentExercise = exerciseState.currentModule?.exercises[newState.exerciseIndex] || null;
       newState.selectedAnswer = null;
+      newState.videoWatched = false;
       setExerciseState(newState);
     }
   };
 
   const completeModule = (finalScore: number) => {
     const newProgress = { ...userProgress };
-    
+
     if (exerciseState.currentModule) {
       newProgress.completedModules.push(exerciseState.currentModule.id);
       newProgress.totalPoints += finalScore;
@@ -173,7 +181,7 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
       newProgress.level = Math.floor(newProgress.xp / 100) + 1;
       newProgress.hearts = exerciseState.hearts;
       newProgress.lastActivityDate = new Date().toISOString();
-      
+
       // Update streak
       const today = new Date();
       const lastActivity = newProgress.lastActivityDate ? new Date(newProgress.lastActivityDate) : null;
@@ -189,7 +197,7 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
     }
 
     setShowExercise(false);
-    setShowCompletion(true);
+    // Module completed logic here
   };
 
   const isSameDay = (date1: Date, date2: Date) => {
@@ -206,21 +214,24 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
     setExerciseState(prev => ({ ...prev, selectedAnswer: answer }));
   };
 
+  const markVideoAsWatched = () => {
+    setExerciseState(prev => ({ ...prev, videoWatched: true }));
+  };
+
   const renderModuleCard = (module: TrainingModule) => {
     const isCompleted = userProgress.completedModules.includes(module.id);
-    const isLocked = module.prerequisites && 
+    const isLocked = module.prerequisites &&
       module.prerequisites.some(prereq => !userProgress.completedModules.includes(prereq));
 
     return (
       <div
         key={module.id}
-        className={`bg-white rounded-2xl p-6 border-2 transition-all duration-300 hover:shadow-lg ${
-          isCompleted 
-            ? 'border-green-200 bg-green-50' 
-            : isLocked 
-            ? 'border-gray-200 bg-gray-50 opacity-60' 
+        className={`bg-white rounded-2xl p-6 border-2 transition-all duration-300 hover:shadow-lg ${isCompleted
+          ? 'border-green-200 bg-green-50'
+          : isLocked
+            ? 'border-gray-200 bg-gray-50 opacity-60'
             : 'border-gray-200 hover:border-green-300'
-        }`}
+          }`}
       >
         <div className="flex items-start justify-between mb-4">
           <div className="text-4xl mb-2">{module.icon}</div>
@@ -267,13 +278,12 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
         <button
           onClick={() => startModule(module)}
           disabled={isLocked}
-          className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
-            isCompleted
-              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-              : isLocked
+          className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${isCompleted
+            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+            : isLocked
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
               : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transform hover:-translate-y-1'
-          }`}
+            }`}
         >
           {isCompleted ? (
             <>
@@ -301,6 +311,8 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
 
     const exercise = exerciseState.currentExercise;
     const progress = ((exerciseState.exerciseIndex + 1) / exerciseState.currentModule.exercises.length) * 100;
+    const isVideo = exercise.type === 'video-lecture';
+    const canSubmit = isVideo ? exerciseState.videoWatched : exerciseState.selectedAnswer !== null;
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -321,9 +333,9 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
                 ))}
               </div>
             </div>
-            
+
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
+              <div
                 className="bg-green-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
@@ -345,10 +357,10 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
             </button>
             <button
               onClick={submitAnswer}
-              disabled={exerciseState.selectedAnswer === null}
+              disabled={!canSubmit}
               className="px-8 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
-              Submit Answer
+              {isVideo ? 'Complete Lesson' : 'Submit Answer'}
             </button>
           </div>
         </div>
@@ -358,6 +370,40 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
 
   const renderExerciseContent = (exercise: Exercise) => {
     switch (exercise.type) {
+      case 'video-lecture':
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <Video className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">{exercise.videoTitle}</h3>
+              <p className="text-gray-600 mb-6">{exercise.question}</p>
+            </div>
+
+            <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-lg">
+              <iframe
+                src={`https://www.youtube.com/embed/${exercise.videoUrl}`}
+                title={exercise.videoTitle}
+                className="absolute top-0 left-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                onLoad={markVideoAsWatched} // Simple tracking for now
+              />
+            </div>
+
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg">
+              <div className="flex items-start gap-3">
+                <Clock className="w-5 h-5 text-blue-500 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-blue-900">Learning Tip</h4>
+                  <p className="text-blue-700 text-sm">{exercise.explanation}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'multiple-choice':
       case 'scenario':
         return (
@@ -373,24 +419,22 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
                 </div>
               )}
             </div>
-            
+
             <div className="space-y-3 max-w-2xl mx-auto">
               {exercise.options?.map((option, index) => (
                 <button
                   key={index}
                   onClick={() => selectAnswer(index)}
-                  className={`w-full p-4 text-left rounded-xl border-2 transition-all duration-200 ${
-                    exerciseState.selectedAnswer === index
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-gray-200 hover:border-gray-300 bg-white'
-                  }`}
+                  className={`w-full p-4 text-left rounded-xl border-2 transition-all duration-200 ${exerciseState.selectedAnswer === index
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${
-                      exerciseState.selectedAnswer === index
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 text-gray-600'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${exerciseState.selectedAnswer === index
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-200 text-gray-600'
+                      }`}>
                       {String.fromCharCode(65 + index)}
                     </div>
                     <span className="text-gray-800">{option}</span>
@@ -412,29 +456,27 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
                 </div>
               )}
             </div>
-            
+
             <div className="flex gap-6 justify-center">
               <button
                 onClick={() => selectAnswer(true)}
-                className={`px-12 py-8 rounded-2xl border-2 transition-all duration-200 ${
-                  exerciseState.selectedAnswer === true
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                }`}
+                className={`px-12 py-8 rounded-2xl border-2 transition-all duration-200 ${exerciseState.selectedAnswer === true
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
               >
                 <div className="text-center">
                   <div className="text-4xl mb-2 text-green-500">✓</div>
                   <div className="text-xl font-bold text-gray-800">TRUE</div>
                 </div>
               </button>
-              
+
               <button
                 onClick={() => selectAnswer(false)}
-                className={`px-12 py-8 rounded-2xl border-2 transition-all duration-200 ${
-                  exerciseState.selectedAnswer === false
-                    ? 'border-red-500 bg-red-50'
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                }`}
+                className={`px-12 py-8 rounded-2xl border-2 transition-all duration-200 ${exerciseState.selectedAnswer === false
+                  ? 'border-red-500 bg-red-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                  }`}
               >
                 <div className="text-center">
                   <div className="text-4xl mb-2 text-red-500">✗</div>
@@ -456,7 +498,7 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
 
   const renderStats = () => {
     const completionRate = modules.length > 0 ? (userProgress.completedModules.length / modules.length) * 100 : 0;
-    
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 border border-green-200">
@@ -467,7 +509,7 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
             <span className="text-2xl font-bold text-green-600">{userProgress.level}</span>
           </div>
           <h3 className="text-gray-600 text-sm font-medium mb-1">Current Level</h3>
-          <p className="text-gray-800 font-semibold">{userProgress.xp} XP</p>
+          <p className="text-gray-800 font-semibold">{userProgress.xp} XP Earned</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200">
@@ -484,23 +526,23 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-6 border border-purple-200">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-purple-200 rounded-xl">
-              <Star className="w-6 h-6 text-purple-600" />
+              <Award className="w-6 h-6 text-purple-600" />
             </div>
-            <span className="text-2xl font-bold text-purple-600">{userProgress.totalPoints}</span>
+            <span className="text-2xl font-bold text-purple-600">{userProgress.certificates.length}</span>
           </div>
-          <h3 className="text-gray-600 text-sm font-medium mb-1">Total Points</h3>
-          <p className="text-gray-800 font-semibold">Earned from training</p>
+          <h3 className="text-gray-600 text-sm font-medium mb-1">Certificates</h3>
+          <p className="text-gray-800 font-semibold">Professional Certifications</p>
         </div>
 
         <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-6 border border-orange-200">
           <div className="flex items-center justify-between mb-4">
             <div className="p-3 bg-orange-200 rounded-xl">
-              <Award className="w-6 h-6 text-orange-600" />
+              <Target className="w-6 h-6 text-orange-600" />
             </div>
-            <span className="text-2xl font-bold text-orange-600">{userProgress.currentStreak}</span>
+            <span className="text-2xl font-bold text-orange-600">Active</span>
           </div>
-          <h3 className="text-gray-600 text-sm font-medium mb-1">Day Streak</h3>
-          <p className="text-gray-800 font-semibold">Keep it up!</p>
+          <h3 className="text-gray-600 text-sm font-medium mb-1">Training Status</h3>
+          <p className="text-gray-800 font-semibold">On Track</p>
         </div>
       </div>
     );
@@ -512,13 +554,18 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
 
   return (
     <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Training Center
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Master waste management skills through interactive, gamified learning experiences
-        </p>
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="text-left">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Training Center
+          </h1>
+          <p className="text-xl text-gray-600">
+            Master waste management skills through interactive modules
+          </p>
+        </div>
+        <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+          <LanguageSwitcher />
+        </div>
       </div>
 
       {renderStats()}

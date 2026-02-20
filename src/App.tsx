@@ -7,6 +7,7 @@ import AdminDashboard from './components/dashboards/AdminDashboard';
 // import GreenChampionDashboard from './components/dashboards/GreenChampionDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
 import CitizenDashboard from './components/dashboards/CitizenDashboard';
+import { ThemeProvider } from './contexts/ThemeContext';
 // import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export type UserRole = 'superadmin' | 'admin' | 'green-champion' | 'worker' | 'citizen';
@@ -100,7 +101,13 @@ function App() {
     }
   };
 
-  return <div className="min-h-screen bg-gray-50">{renderDashboard()}</div>;
+  return (
+    <ThemeProvider>
+      <div className="min-h-screen bg-gray-50 transition-colors duration-300">
+        {renderDashboard()}
+      </div>
+    </ThemeProvider>
+  );
 }
 
 export default App;

@@ -1,72 +1,70 @@
 import React from 'react';
-import { Menu, LogOut, Bell, User as UserIcon } from 'lucide-react';
+import { Menu, LogOut, Bell, User as UserIcon, Recycle } from 'lucide-react';
 import { User } from '../../App';
 import LanguageSwitcher from './LanguageSwitcher';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface HeaderProps {
   user: User;
   onLogout: () => void;
-  onToggleSidebar?: () => void;
+  toggleSidebar?: () => void;
+  onProfileClick?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, onToggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onProfileClick }) => {
+  const { t } = useLanguage();
   return (
-    <header className="bg-white border-b border-gray-200 h-16 fixed top-0 left-0 right-0 z-50 shadow-sm">
-      <div className="flex items-center justify-between h-full px-4 sm:px-6">
-        {/* LEFT: Toggle + Logo + Text */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          {/* Sidebar toggle stays in normal flow so it doesn't overlap */}
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-700 lg:hidden flex-shrink-0"
-            aria-label="Toggle sidebar"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-
-          {/* Logo */}
-          <img
-            src="/logo.png"
-            alt="Safai Connect"
-            className="h-6 sm:h-8 md:h-10 w-auto object-contain flex-shrink-0"
-          />
-
-          {/* Text block (truncate so it never pushes over the toggle) */}
-          <div className="min-w-0 leading-tight">
-            <p className="hidden sm:block text-sm sm:text-base font-semibold text-gray-900 truncate">
-              {user.name}
-            </p>
-            <p className="hidden sm:block text-[10px] sm:text-xs text-gray-500 capitalize truncate">
-              {user.role.replace('-', ' ')} Dashboard
-            </p>
-          </div>
-        </div>
-
-        {/* RIGHT: Actions */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-          <LanguageSwitcher />
-          <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg" aria-label="Notifications">
-            <Bell className="w-5 h-5" />
-          </button>
-
-          <div className="flex items-center gap-2 px-2 py-2 bg-gray-50 rounded-lg">
-            <div className="w-8 h-8 flex items-center justify-center bg-green-100 rounded-full">
-              <UserIcon className="w-4 h-4 text-green-600" />
-            </div>
-            <div className="hidden md:block text-sm leading-tight">
-              <p className="font-medium text-gray-900 truncate max-w-[160px]">{user.name}</p>
-              <p className="text-gray-500 truncate max-w-[200px]">{user.email}</p>
+    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30 transition-all duration-300">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={toggleSidebar}
+              className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <div className="flex items-center gap-2 transition-transform hover:scale-105 duration-300">
+              <div className="bg-green-600 p-2 rounded-lg shadow-lg shadow-green-200">
+                <Recycle className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-green-700 to-green-500 bg-clip-text text-transparent">
+                  Safai <span className="text-2xl font-extrabold text-green-600">कनेक्ट</span>
+                </h1>
+              </div>
             </div>
           </div>
 
-          <button onClick={onLogout} className="sm:hidden p-2 text-red-600 hover:bg-red-50 rounded-lg" aria-label="Logout">
-            <LogOut className="w-5 h-5" />
-          </button>
-          <button onClick={onLogout} className="hidden sm:flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg">
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm font-medium">Logout</span>
-          </button>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <LanguageSwitcher />
+
+            <button className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors relative group">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+            </button>
+
+            <div
+              className="hidden sm:flex items-center gap-3 pl-4 border-l border-gray-200 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+              onClick={onProfileClick}
+            >
+              <div className="flex flex-col items-end">
+                <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                <span className="text-xs text-gray-500 capitalize">{t(user.role)}</span>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center border-2 border-white shadow-sm">
+                <UserIcon className="w-5 h-5 text-green-600" />
+              </div>
+            </div>
+
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors ml-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('logout')}</span>
+            </button>
+          </div>
         </div>
       </div>
     </header>

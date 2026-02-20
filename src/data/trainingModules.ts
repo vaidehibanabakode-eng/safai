@@ -1,5 +1,5 @@
 export interface Exercise {
-  type: 'multiple-choice' | 'drag-drop' | 'fill-blank' | 'matching' | 'true-false' | 'scenario';
+  type: 'multiple-choice' | 'drag-drop' | 'fill-blank' | 'matching' | 'true-false' | 'scenario' | 'video-lecture';
   question: string;
   image?: string;
   options?: string[];
@@ -19,6 +19,8 @@ export interface Exercise {
   statement?: string;
   scenario?: string;
   icon?: string;
+  videoUrl?: string;
+  videoTitle?: string;
 }
 
 export interface TrainingModule {
@@ -51,6 +53,14 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
         'Practice sorting common household items'
       ],
       exercises: [
+        {
+          type: 'video-lecture',
+          question: 'Watch this guide on proper waste segregation',
+          videoTitle: 'Waste Segregation Guide',
+          videoUrl: 'Y2W0jPg2JBk',
+          points: 50,
+          explanation: 'Visual learning helps reinforce proper sorting habits.'
+        },
         {
           type: 'multiple-choice',
           question: 'Which bin should you use for food scraps and organic waste?',
@@ -163,6 +173,14 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
       ],
       exercises: [
         {
+          type: 'video-lecture',
+          question: 'Essential Safety Protocols for Waste Collectors',
+          videoTitle: 'Waste Management Safety',
+          videoUrl: 'Y2W0jPg2JBk', // Placeholder until specific ID confirmed
+          points: 50,
+          explanation: 'Safety is the top priority in waste management operations.'
+        },
+        {
           type: 'multiple-choice',
           question: 'What is the most important PPE item for waste collection workers?',
           image: '🦺',
@@ -264,6 +282,14 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
       ],
       exercises: [
         {
+          type: 'video-lecture',
+          question: 'Inspiring Community Action',
+          videoTitle: 'Community Leaders on Impactful Organizing',
+          videoUrl: 'e0P70wz3F84',
+          points: 50,
+          explanation: 'Leadership starts with understanding community needs and empowering others.'
+        },
+        {
           type: 'scenario',
           icon: '🎪',
           scenario: 'You want to organize a community cleanup event, but only 3 people signed up out of 200 households in your area.',
@@ -323,6 +349,14 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
       ],
       exercises: [
         {
+          type: 'video-lecture',
+          question: 'Strategic Waste Systems Management',
+          videoTitle: 'Modern Waste Management Systems',
+          videoUrl: 'Y2W0jPg2JBk', // Placeholder
+          points: 50,
+          explanation: 'Effective management requires understanding the entire waste lifecycle.'
+        },
+        {
           type: 'scenario',
           icon: '📈',
           scenario: 'Your city\'s waste collection efficiency has dropped to 75% this month. Citizens are complaining about missed pickups, and costs are 20% over budget.',
@@ -356,6 +390,14 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
         'Understand municipal governance and compliance'
       ],
       exercises: [
+        {
+          type: 'video-lecture',
+          question: 'Leadership in Sustainable Urban Development',
+          videoTitle: 'Urban Sustainability Leadership',
+          videoUrl: 'v_3Y8h5G0sM',
+          points: 60,
+          explanation: 'Visionary leadership drives long-term sustainable change.'
+        },
         {
           type: 'scenario',
           icon: '🏙️',
