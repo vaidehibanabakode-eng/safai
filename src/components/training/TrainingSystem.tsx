@@ -14,6 +14,8 @@ import {
   Share2,
   Video
 } from 'lucide-react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { User } from '../../App';
 import LanguageSwitcher from '../common/LanguageSwitcher';
 import { TRAINING_MODULES, TrainingModule, Exercise } from '../../data/trainingModules';
@@ -77,16 +79,38 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
     loadUserProgress();
   }, [user.id]);
 
-  const loadUserProgress = () => {
-    const saved = localStorage.getItem(`training_progress_${user.id}`);
-    if (saved) {
-      setUserProgress(JSON.parse(saved));
+  const loadUserProgress = async () => {
+    try {
+      const docRef = doc(db, 'training', user.id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserProgress({
+          completedModules: data.completedModules || [],
+          totalPoints: data.totalPoints || 0,
+          certificates: data.certificates || [],
+          currentStreak: data.currentStreak || 0,
+          lastActivityDate: data.lastActivityDate || null,
+          hearts: data.hearts !== undefined ? data.hearts : 5,
+          level: data.level || 1,
+          xp: data.xp || 0,
+          achievements: data.achievements || []
+        });
+      }
+    } catch (error) {
+      console.error('Error loading training progress:', error);
     }
   };
 
-  const saveUserProgress = (progress: UserProgress) => {
+  const saveUserProgress = async (progress: UserProgress) => {
     setUserProgress(progress);
-    localStorage.setItem(`training_progress_${user.id}`, JSON.stringify(progress));
+    try {
+      // Also ensuring we save userId for comprehensive tracking
+      const dataToSave = { ...progress, userId: user.id };
+      await setDoc(doc(db, 'training', user.id), dataToSave, { merge: true });
+    } catch (error) {
+      console.error('Error saving training progress:', error);
+    }
   };
 
   const startModule = (module: TrainingModule) => {
@@ -175,10 +199,15 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
     const newProgress = { ...userProgress };
 
     if (exerciseState.currentModule) {
-      newProgress.completedModules.push(exerciseState.currentModule.id);
-      newProgress.totalPoints += finalScore;
-      newProgress.xp += finalScore;
-      newProgress.level = Math.floor(newProgress.xp / 100) + 1;
+      if (!newProgress.completedModules.includes(exerciseState.currentModule.id)) {
+        newProgress.completedModules.push(exerciseState.currentModule.id);
+        // Increment xp by exactly 100 as requested
+        newProgress.xp += 100;
+      }
+
+      newProgress.totalPoints += finalScore; // keeping original score logic alongside new XP logic just in case
+      // Increment current level for every 500 xp
+      newProgress.level = Math.floor(newProgress.xp / 500) + 1;
       newProgress.hearts = exerciseState.hearts;
       newProgress.lastActivityDate = new Date().toISOString();
 

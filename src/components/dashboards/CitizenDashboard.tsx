@@ -25,13 +25,13 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation as CapGeolocation } from '@capacitor/geolocation';
-import { User } from '../../App';
 import Layout from '../common/Layout';
-import StatCard from '../common/StatCard';
 import TrainingSystem from '../training/TrainingSystem';
 import ProfilePage from '../common/ProfilePage';
-import { useLanguage } from '../../contexts/LanguageContext';
 import SettingsTab from './tabs/SettingsTab';
+import { User } from '../../App';
+import StatCard from '../common/StatCard';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 
 interface CitizenDashboardProps {
@@ -58,6 +58,31 @@ declare global {
     webkitSpeechRecognition: new () => ISpeechRecognition;
   }
 }
+
+// Add StatusBadge component logic outside the main component or inside as a helper
+const StatusBadge = ({ status }: { status: string }) => {
+  const normalizedStatus = status.toUpperCase();
+
+  if (normalizedStatus === 'RESOLVED' || normalizedStatus === 'CLOSED') {
+    return (
+      <span className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full bg-green-100 text-green-800">
+        {status.replace('_', ' ')}
+      </span>
+    );
+  }
+  if (normalizedStatus === 'SUBMITTED') {
+    return (
+      <span className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full bg-purple-100 text-purple-800">
+        {status.replace('_', ' ')}
+      </span>
+    );
+  }
+  return (
+    <span className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full bg-yellow-100 text-yellow-800">
+      {status.replace('_', ' ')}
+    </span>
+  );
+};
 
 const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('home'); // Changed default to 'home' to match new key
@@ -111,22 +136,26 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     return () => unsubscribe();
   }, [user, activeTab]);
 
-  // Load training progress for stats
+  // Load training progress for stats from Firestore
   const [trainingProgress, setTrainingProgress] = useState(0);
 
   React.useEffect(() => {
     if (!user) return;
-    const savedProgress = localStorage.getItem(`training_progress_${user.id}`);
-    if (savedProgress) {
-      try {
-        const data = JSON.parse(savedProgress);
-        // We need total modules to calculate percentage. It's stored in TRAINING_MODULES, but since it depends on the role, we'll assume a standard count or dynamically import.
-        // For now, getting length of completed over an assumed total of 4 (from TrainingSystem typical citizen modules). We'll set it dynamically.
-        const totalCitizenModules = 4; // Default guess based on TrainingSystem
-        const percentage = Math.round((data.completedModules.length / totalCitizenModules) * 100);
+    const trainingDocRef = doc(db, 'training', user.id);
+    const unsubscribe = onSnapshot(trainingDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const completedModules = data.completedModules || [];
+        // Assuming 4 modules for Citizen as a default base for the percentage
+        const totalCitizenModules = 4;
+        const percentage = Math.round((completedModules.length / totalCitizenModules) * 100);
         setTrainingProgress(Math.min(percentage, 100)); // Cap at 100
-      } catch (e) { console.error("Could not parse training progress", e); }
-    }
+      } else {
+        setTrainingProgress(0);
+      }
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   const handleOpenRating = (complaintId: string) => {
@@ -824,12 +853,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                         </div>
                       </div>
                       <div className="flex items-center gap-3 self-end sm:self-center">
-                        <span className={`px-3 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full ${report.status === 'RESOLVED' || report.status === 'CLOSED' ? 'bg-green-100 text-green-800' :
-                          report.status === 'SUBMITTED' ? 'bg-purple-100 text-purple-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                          {report.status.replace('_', ' ')}
-                        </span>
+                        <StatusBadge status={report.status} />
 
                         {report.status === 'RESOLVED' && (
                           <button
@@ -848,72 +872,74 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
             </div>
 
             {/* Rating Modal */}
-            {ratingModalOpen && complaintToRate && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
-                <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                  <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-emerald-50/50">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Rate Final Work</h3>
-                      <p className="text-sm text-gray-500">Your feedback improves our community</p>
-                    </div>
-                    <button
-                      onClick={() => setRatingModalOpen(false)}
-                      className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-white transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="flex justify-center gap-2 mb-6">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          onClick={() => setRating(star)}
-                          className={`transition-all duration-200 hover:scale-110 ${rating >= star ? 'text-yellow-400 scale-110 drop-shadow-md' : 'text-gray-200 hover:text-yellow-200'}`}
-                        >
-                          <Star className="w-12 h-12" fill={rating >= star ? "currentColor" : "none"} />
-                        </button>
-                      ))}
+            {
+              ratingModalOpen && complaintToRate && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
+                  <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-emerald-50/50">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">Rate Final Work</h3>
+                        <p className="text-sm text-gray-500">Your feedback improves our community</p>
+                      </div>
+                      <button
+                        onClick={() => setRatingModalOpen(false)}
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-white transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
 
-                    <div className="mb-2 flex justify-between text-xs font-semibold text-gray-400 px-2 uppercase tracking-wider">
-                      <span>Poor</span>
-                      <span>Excellent</span>
+                    <div className="p-6">
+                      <div className="flex justify-center gap-2 mb-6">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => setRating(star)}
+                            className={`transition-all duration-200 hover:scale-110 ${rating >= star ? 'text-yellow-400 scale-110 drop-shadow-md' : 'text-gray-200 hover:text-yellow-200'}`}
+                          >
+                            <Star className="w-12 h-12" fill={rating >= star ? "currentColor" : "none"} />
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mb-2 flex justify-between text-xs font-semibold text-gray-400 px-2 uppercase tracking-wider">
+                        <span>Poor</span>
+                        <span>Excellent</span>
+                      </div>
+
+                      <div className="mt-6">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Feedback (Optional)</label>
+                        <textarea
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all duration-200"
+                          rows={3}
+                          placeholder="Tell us what went well or what could be improved..."
+                          value={ratingNotes}
+                          onChange={(e) => setRatingNotes(e.target.value)}
+                        ></textarea>
+                      </div>
                     </div>
 
-                    <div className="mt-6">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Feedback (Optional)</label>
-                      <textarea
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all duration-200"
-                        rows={3}
-                        placeholder="Tell us what went well or what could be improved..."
-                        value={ratingNotes}
-                        onChange={(e) => setRatingNotes(e.target.value)}
-                      ></textarea>
+                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+                      <button
+                        onClick={() => setRatingModalOpen(false)}
+                        className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSubmitRating}
+                        disabled={rating === 0 || isSubmittingRating}
+                        className="px-6 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl hover:from-emerald-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-200 transition-all flex items-center gap-2"
+                      >
+                        {isSubmittingRating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        Submit Rating
+                      </button>
                     </div>
-                  </div>
-
-                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-                    <button
-                      onClick={() => setRatingModalOpen(false)}
-                      className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSubmitRating}
-                      disabled={rating === 0 || isSubmittingRating}
-                      className="px-6 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl hover:from-emerald-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-emerald-200 transition-all flex items-center gap-2"
-                    >
-                      {isSubmittingRating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      Submit Rating
-                    </button>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )
+            }
+          </div >
         );
 
       case 'training':

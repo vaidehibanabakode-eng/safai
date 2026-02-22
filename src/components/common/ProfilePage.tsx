@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { User } from '../../App';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 
 interface ProfilePageProps {
     user: User;
@@ -40,11 +42,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
     });
     const [saved, setSaved] = useState(false);
 
-    const handleSave = () => {
-        // TODO: call PATCH /api/auth/me with form data
-        setIsEditing(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const userRef = doc(db, 'users', user.id);
+            await updateDoc(userRef, {
+                name: form.name,
+                phone: form.phone,
+                assignedZone: form.zone,
+                address: form.address,
+            });
+            setIsEditing(false);
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            alert('Failed to update profile. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const field = (
@@ -124,10 +142,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
                             <>
                                 <button
                                     onClick={handleSave}
-                                    className="flex items-center gap-2 px-4 py-2 bg-white text-green-700 rounded-xl text-sm font-medium hover:bg-green-50 transition-colors shadow"
+                                    disabled={isSaving}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white text-green-700 rounded-xl text-sm font-medium hover:bg-green-50 transition-colors shadow disabled:opacity-70"
                                 >
                                     <Save className="w-4 h-4" />
-                                    {t('save_profile')}
+                                    {isSaving ? 'Saving...' : t('save_profile')}
                                 </button>
                                 <button
                                     onClick={() => setIsEditing(false)}

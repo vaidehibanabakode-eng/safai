@@ -12,6 +12,8 @@ import {
 import { User } from '../../../App';
 import LanguageSwitcher from '../../common/LanguageSwitcher';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 
 // import { useTheme } from '../../../contexts/ThemeContext'; // Removed
 
@@ -19,10 +21,40 @@ interface SettingsTabProps {
     user?: User;
 }
 
-const SettingsTab: React.FC<SettingsTabProps> = () => {
-    const [emailNotif, setEmailNotif] = useState(true);
-    const [pushNotif, setPushNotif] = useState(true);
+const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
+    const [emailNotif, setEmailNotif] = useState(user?.preferences?.notifications ?? true);
+    const [pushNotif, setPushNotif] = useState(user?.preferences?.notifications ?? true);
     const [smsNotif, setSmsNotif] = useState(false);
+
+    const handlePreferencesUpdate = async (field: string, value: boolean) => {
+        if (!user) return;
+        try {
+            const userRef = doc(db, 'users', user.id);
+            await updateDoc(userRef, {
+                [`preferences.${field}`]: value
+            });
+        } catch (error) {
+            console.error('Error updating preferences:', error);
+        }
+    };
+
+    const toggleEmailNotif = () => {
+        const newValue = !emailNotif;
+        setEmailNotif(newValue);
+        handlePreferencesUpdate('emailNotif', newValue);
+    };
+
+    const togglePushNotif = () => {
+        const newValue = !pushNotif;
+        setPushNotif(newValue);
+        handlePreferencesUpdate('notifications', newValue);
+    };
+
+    const toggleSmsNotif = () => {
+        const newValue = !smsNotif;
+        setSmsNotif(newValue);
+        handlePreferencesUpdate('smsNotif', newValue);
+    };
     // const { theme, toggleTheme } = useTheme(); // Removed for forced light mode
     const { t } = useLanguage();
 
@@ -78,7 +110,7 @@ const SettingsTab: React.FC<SettingsTabProps> = () => {
                                 </div>
                             </div>
                             <button
-                                onClick={() => setEmailNotif(!emailNotif)}
+                                onClick={toggleEmailNotif}
                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${emailNotif ? 'bg-emerald-600' : 'bg-gray-200'}`}
                             >
                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${emailNotif ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -94,7 +126,7 @@ const SettingsTab: React.FC<SettingsTabProps> = () => {
                                 </div>
                             </div>
                             <button
-                                onClick={() => setPushNotif(!pushNotif)}
+                                onClick={togglePushNotif}
                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${pushNotif ? 'bg-emerald-600' : 'bg-gray-200'}`}
                             >
                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${pushNotif ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -110,7 +142,7 @@ const SettingsTab: React.FC<SettingsTabProps> = () => {
                                 </div>
                             </div>
                             <button
-                                onClick={() => setSmsNotif(!smsNotif)}
+                                onClick={toggleSmsNotif}
                                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${smsNotif ? 'bg-emerald-600' : 'bg-gray-200'}`}
                             >
                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${smsNotif ? 'translate-x-6' : 'translate-x-1'}`} />

@@ -19,6 +19,14 @@ export interface User {
   email: string;
   role: UserRole;
   name: string;
+  phone?: string;
+  address?: string;
+  citizenID?: string;
+  assignedZone?: string;
+  preferences?: {
+    notifications?: boolean;
+    language?: string;
+  };
 }
 
 const LS_VIEW_KEY = 'currentView_safai';
@@ -60,7 +68,12 @@ function App() {
     id: userProfile.uid,
     email: userProfile.email,
     name: userProfile.name,
-    role: userProfile.role.toLowerCase() as UserRole
+    role: userProfile.role.toLowerCase() as UserRole,
+    phone: userProfile.phone,
+    address: userProfile.address,
+    citizenID: userProfile.citizenID,
+    assignedZone: userProfile.assignedZone || userProfile.area,
+    preferences: userProfile.preferences,
   } : localAuthFallback;
 
   // Only show loading spinner if AuthContext is explicitly loading

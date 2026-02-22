@@ -55,7 +55,16 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 name: name,
                 role: firestoreRole,
                 createdAt: serverTimestamp(),
-                rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined
+                rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
+                phone: '',
+                address: '',
+                citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+                assignedZone: '',
+                memberSince: serverTimestamp(),
+                preferences: {
+                    notifications: true,
+                    language: 'en'
+                }
             });
 
             onSignupSuccess(email);
@@ -109,7 +118,16 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                     name: user.displayName || 'Google User',
                     role: firestoreRole,
                     createdAt: serverTimestamp(),
-                    rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined
+                    rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
+                    phone: '',
+                    address: '',
+                    citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+                    assignedZone: '',
+                    memberSince: serverTimestamp(),
+                    preferences: {
+                        notifications: true,
+                        language: 'en'
+                    }
                 });
             }
 

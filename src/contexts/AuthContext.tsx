@@ -12,6 +12,15 @@ export interface UserProfile {
     area?: string;
     rewardPoints?: number;
     createdAt?: any;
+    phone?: string;
+    address?: string;
+    citizenID?: string;
+    assignedZone?: string;
+    memberSince?: any;
+    preferences?: {
+        notifications?: boolean;
+        language?: string;
+    };
 }
 
 interface AuthContextType {
@@ -72,7 +81,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         role: resolvedRole,
                         area: firestoreData?.area,
                         rewardPoints: firestoreData?.rewardPoints,
-                        createdAt: firestoreData?.createdAt
+                        createdAt: firestoreData?.createdAt,
+                        phone: firestoreData?.phone,
+                        address: firestoreData?.address,
+                        citizenID: firestoreData?.citizenID,
+                        assignedZone: firestoreData?.assignedZone,
+                        memberSince: firestoreData?.memberSince,
+                        preferences: firestoreData?.preferences
                     });
                 } catch (error) {
                     console.error("Error fetching user profile:", error);
