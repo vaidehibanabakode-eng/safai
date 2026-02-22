@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Anyone authenticated can view images
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+    }
+
+    // Workers can upload evidence photos
+    match /evidence/{imageId} {
+      allow write: if request.auth != null; 
+      // In production, we would strictly lock this to WORKER custom claims
+    }
+
+    // Citizens can upload complaint profile pictures
+    match /complaints/{imageId} {
+      allow write: if request.auth != null;
+      // In production, we would strictly lock this to CITIZEN custom claims
+    }
+  }
+}

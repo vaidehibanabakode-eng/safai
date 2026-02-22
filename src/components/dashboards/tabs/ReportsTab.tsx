@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
     FileText,
     Download,
@@ -17,7 +17,6 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 
 const ReportsTab: React.FC = () => {
     const { t } = useLanguage();
-    const [dateRange, setDateRange] = useState(t('this_month'));
 
     const zones = [
         { name: 'Zone A', complaints: 145, resolved: 140, avgTime: '2.5h', satisfaction: '4.8/5', status: 'Excellent' },
@@ -91,7 +90,7 @@ const ReportsTab: React.FC = () => {
                     </button>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full min-w-[800px]">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('zone_name')}</th>

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { LogIn, ArrowLeft, Leaf, ShieldCheck, Mail, Lock } from 'lucide-react';
+import { LogIn, ArrowLeft, ShieldCheck, Mail, Lock } from 'lucide-react';
 import { User } from '../App';
-import { login } from '../utils/auth';
 import { useLanguage } from '../contexts/LanguageContext';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../lib/firebase';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -17,29 +18,54 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useLanguage();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulate network delay
-    setTimeout(() => {
-      const user = login(email);
+    try {
+      // Authenticate with Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
-      if (user) {
-        onLogin(user);
+      // Wait for AuthContext's onAuthStateChanged to pick this up.
+      // We pass a stub User object since App.tsx expects one until we fully migrate it out of props.
+      onLogin({
+        id: userCredential.user.uid,
+        email: userCredential.user.email || '',
+        name: userCredential.user.displayName || 'User',
+        role: 'citizen' // this gets overridden by AuthContext anyway
+      });
+
+    } catch (err: any) {
+      console.error('Login error:', err);
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Invalid email or password.');
       } else {
-        // FALLBACK for specific demo emails if not in local storage
-        if (email === 'admin@safai.com') onLogin({ id: 'demo-admin', email, role: 'admin', name: 'Demo Admin' });
-        else if (email === 'worker@safai.com') onLogin({ id: 'demo-worker', email, role: 'worker', name: 'Demo Worker' });
-        else if (email === 'citizen@safai.com') onLogin({ id: 'demo-citizen', email, role: 'citizen', name: 'Demo Citizen' });
-        else if (email === 'superadmin@safai.com') onLogin({ id: 'demo-superadmin', email, role: 'superadmin', name: 'Demo Super Admin' });
-        else {
-          setError('Invalid credentials. Please check your email or sign up.');
-        }
+        setError('Failed to log in. Please try again.');
       }
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const userCredential = await signInWithPopup(auth, googleProvider);
+
+      onLogin({
+        id: userCredential.user.uid,
+        email: userCredential.user.email || '',
+        name: userCredential.user.displayName || 'User',
+        role: 'citizen'
+      });
+    } catch (err: any) {
+      console.error('Google Login Error:', err);
+      setError('Failed to log in with Google. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,10 +81,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
 
         <div className="relative z-20 text-white p-12 max-w-lg">
           <div className="flex items-center space-x-3 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm shadow-xl border border-white/10">
-              <Leaf className="w-8 h-8 text-emerald-300" />
+            <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm shadow-xl border border-white/10">
+              <img src="/logo.png" alt="Safai Connect Logo" className="w-auto h-12 object-contain drop-shadow-md" />
             </div>
-            <span className="text-3xl font-bold tracking-tight text-shadow-sm">Safai Connect</span>
           </div>
 
           <h2 className="text-5xl font-bold leading-tight mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
@@ -81,18 +106,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
       </div>
 
       {/* Right Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 bg-white">
-        <div className="w-full max-w-md space-y-8 animate-in slide-in-from-right duration-500">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 bg-white">
+        <div className="w-full max-w-md space-y-6 sm:space-y-8 animate-in slide-in-from-right duration-500">
           <div className="text-center lg:text-left">
             <button
               onClick={onBack}
-              className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-8 group"
+              className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-6 sm:mb-8 group"
             >
               <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
               {t('back_home')}
             </button>
-            <h2 className="text-3xl font-bold text-gray-900">{t('sign_in')}</h2>
-            <p className="mt-2 text-gray-600">{t('enter_details')}</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('sign_in')}</h2>
+            <p className="mt-2 text-sm sm:text-base text-gray-600">{t('enter_details')}</p>
           </div>
 
           {error && (
@@ -100,6 +125,28 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
               {error}
             </div>
           )}
+
+          <div className="flex flex-col gap-4">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+              className="w-full bg-white text-gray-700 font-bold py-3.5 px-6 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transform transition-all duration-200 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+              </svg>
+              Log in with Google
+            </button>
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="flex-shrink-0 mx-4 text-gray-400 text-sm font-medium">OR</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-5">
@@ -164,36 +211,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
                 {t('sign_up_now')}
               </button>
             </p>
-
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 text-center">{t('quick_demo')}</p>
-              <div className="grid grid-cols-2 gap-2 text-xs font-medium text-gray-600">
-                <button
-                  onClick={() => setEmail('superadmin@safai.com')}
-                  className="p-2 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 transition-all text-center shadowing-sm"
-                >
-                  {t('role_superadmin')}
-                </button>
-                <button
-                  onClick={() => setEmail('admin@safai.com')}
-                  className="p-2 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 transition-all text-center shadowing-sm"
-                >
-                  {t('role_admin')}
-                </button>
-                <button
-                  onClick={() => setEmail('worker@safai.com')}
-                  className="p-2 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 transition-all text-center shadowing-sm"
-                >
-                  {t('role_worker')}
-                </button>
-                <button
-                  onClick={() => setEmail('citizen@safai.com')}
-                  className="p-2 bg-white rounded-lg border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 transition-all text-center shadowing-sm"
-                >
-                  {t('role_citizen')}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>

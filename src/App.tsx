@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import SignupPage from './components/SignupPage';
@@ -8,8 +8,9 @@ import AdminDashboard from './components/dashboards/AdminDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
 import CitizenDashboard from './components/dashboards/CitizenDashboard';
 import { ThemeProvider } from './contexts/ThemeContext';
-import app from "./firebase";
-// import { SpeedInsights } from "@vercel/speed-insights/next";
+import { useAuth } from './contexts/AuthContext';
+import { auth } from './lib/firebase';
+import { signOut } from 'firebase/auth';
 
 export type UserRole = 'superadmin' | 'admin' | 'green-champion' | 'worker' | 'citizen';
 
@@ -20,83 +21,114 @@ export interface User {
   name: string;
 }
 
-const LS_KEY = 'currentUser';
+const LS_VIEW_KEY = 'currentView_safai';
 
 type ViewState = 'landing' | 'login' | 'signup';
 
 function App() {
-  const [currentView, setCurrentView] = useState<ViewState>('landing');
+  const { currentUser, userProfile, loading } = useAuth();
 
-  // Rehydrate from localStorage on first render
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      return raw ? (JSON.parse(raw) as User) : null;
-    } catch {
-      return null;
-    }
+  const [currentView, setCurrentView] = useState<ViewState>(() => {
+    return (localStorage.getItem(LS_VIEW_KEY) as ViewState) || 'landing';
   });
 
+  const handleSetView = (view: ViewState) => {
+    setCurrentView(view);
+    localStorage.setItem(LS_VIEW_KEY, view);
+  };
+
+  const [localAuthFallback, setLocalAuthFallback] = useState<User | null>(null);
+
   const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    localStorage.setItem(LS_KEY, JSON.stringify(user));
+    // TEMPORARY FALLBACK: keep passing prop until we remove all local states
+    setLocalAuthFallback(user);
+    handleSetView('login');
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setCurrentView('landing'); // Reset to landing page on logout
-    localStorage.removeItem(LS_KEY);
+  const handleLogout = async () => {
+    setLocalAuthFallback(null);
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    handleSetView('landing');
   };
 
-  if (!currentUser) {
+  // Active User object to pass to dashboards (compat bridge)
+  const activeUser: User | null = userProfile ? {
+    id: userProfile.uid,
+    email: userProfile.email,
+    name: userProfile.name,
+    role: userProfile.role.toLowerCase() as UserRole
+  } : localAuthFallback;
+
+  // Only show loading spinner if AuthContext is explicitly loading
+  // Or if we have a Firebase user but haven't resolved their activeUser profile yet
+  const isProfilePending = currentUser && !activeUser && !loading;
+
+  if (loading || isProfilePending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  if (!currentUser && !localAuthFallback) {
     switch (currentView) {
       case 'login':
         return (
           <LoginPage
             onLogin={handleLogin}
-            onNavigateToSignup={() => setCurrentView('signup')}
-            onBack={() => setCurrentView('landing')}
+            onNavigateToSignup={() => handleSetView('signup')}
+            onBack={() => handleSetView('landing')}
           />
         );
       case 'signup':
         return (
           <SignupPage
             onSignupSuccess={(_email) => {
-              // Auto-fill email in login or just go to login?
-              // Let's go to Login
-              setCurrentView('login');
-              // Optional: Show success toast (not implemented yet, simple flow for now)
+              handleSetView('login');
             }}
-            onNavigateToLogin={() => setCurrentView('login')}
-          // onBack={() => setCurrentView('landing')} // Signup usually has back to login
+            onNavigateToLogin={() => handleSetView('login')}
           />
         );
       case 'landing':
       default:
-        return <LandingPage onGetStarted={() => setCurrentView('login')} />;
+        return <LandingPage onGetStarted={() => handleSetView('login')} />;
     }
   }
 
   const renderDashboard = () => {
-    switch (currentUser.role) {
+    if (!activeUser) {
+      // If we are logged out or missing profile data, fallback gracefully to login
+      return (
+        <LoginPage
+          onLogin={handleLogin}
+          onNavigateToSignup={() => handleSetView('signup')}
+          onBack={() => handleSetView('landing')}
+        />
+      );
+    }
+
+    switch (activeUser.role) {
       case 'superadmin':
-        return <SuperadminDashboard user={currentUser} onLogout={handleLogout} />;
+        return <SuperadminDashboard user={activeUser} onLogout={handleLogout} />;
       case 'admin':
-        return <AdminDashboard user={currentUser} onLogout={handleLogout} />;
-      // case 'green-champion':
-      //   return <GreenChampionDashboard user={currentUser} onLogout={handleLogout} />;
+        return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
       case 'worker':
-        return <WorkerDashboard user={currentUser} onLogout={handleLogout} />;
+        return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
       case 'citizen':
-        return <CitizenDashboard user={currentUser} onLogout={handleLogout} />;
+        return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
       default:
-        // Fallback safety: clear bad state and show login
-        localStorage.removeItem(LS_KEY);
+        // Fallback safety
+        handleLogout();
         return (
           <LoginPage
             onLogin={handleLogin}
-            onNavigateToSignup={() => setCurrentView('signup')}
-            onBack={() => setCurrentView('landing')}
+            onNavigateToSignup={() => handleSetView('signup')}
+            onBack={() => handleSetView('landing')}
           />
         );
     }

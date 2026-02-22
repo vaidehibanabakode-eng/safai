@@ -1,0 +1,66 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check custom claims
+    function hasRole(role) {
+      return request.auth != null && request.auth.token.role == role;
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // `users` collection:
+    // Anyone authenticated can read basic profiles.
+    // Only Super Admins can write arbitrary profiles. Citizens/Workers can ONLY write to their own upon signup.
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      
+      // Allow user to create THEIR OWN profile, but enforce that it only creates Citizen/Worker roles
+      allow create: if isAuthenticated() 
+                    && request.auth.uid == userId
+                    && (request.resource.data.role == 'Citizen' || request.resource.data.role == 'Worker');
+      
+      // Allow users to update their own profile, except they cannot elevate their role
+      allow update: if isAuthenticated() 
+                    && request.auth.uid == userId
+                    && request.resource.data.role == resource.data.role; // Block role tampering
+                    
+      // Super Admins have full access
+      allow write: if hasRole("SUPER_ADMIN");
+    }
+
+    // `complaints` collection:
+    // Citizens create complaints. Admins can update them (assign, resolve).
+    match /complaints/{complaintId} {
+      allow read: if isAuthenticated(); // Assuming all users can see complaints for now to populate maps/feeds
+      allow create: if hasRole("CITIZEN") || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Citizen"; 
+      allow update: if hasRole("ADMIN") || hasRole("SUPER_ADMIN");
+      allow delete: if hasRole("SUPER_ADMIN");
+    }
+
+    // `assignments` collection: Many-To-Many mapping between complaints and workers
+    match /assignments/{assignmentId} {
+      allow read: if isAuthenticated(); // Allows workers to see their assignments and admins to see all
+      allow create: if hasRole("ADMIN") || hasRole("SUPER_ADMIN"); // Only admins assign
+      allow update: if hasRole("WORKER") || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Worker"; // Workers can update their own status to COMPLETED
+      allow delete: if hasRole("ADMIN") || hasRole("SUPER_ADMIN");
+    }
+
+    // `completion_evidence` collection: Worker photos and notes
+    match /completion_evidence/{evidenceId} {
+      allow read: if isAuthenticated();
+      allow create: if hasRole("WORKER") || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Worker";
+      // No updates/deletes to evidence after submission (append-only ledger)
+    }
+
+    // `ratings` collection: Citizen ratings of resolved complaints
+    match /ratings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create: if hasRole("CITIZEN") || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Citizen";
+      allow update: if hasRole("CITIZEN") || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Citizen"; // In case they edit their review
+    }
+  }
+}

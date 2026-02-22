@@ -1,9 +1,7 @@
 import React from 'react';
 import {
-    BarChart3,
     Users,
     AlertTriangle,
-    TrendingUp,
     ArrowUpRight,
     ArrowDownRight,
     Activity

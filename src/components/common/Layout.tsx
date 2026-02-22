@@ -20,6 +20,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 
 const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, sidebarItems, onProfileClick }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { t } = useLanguage();
 
@@ -36,7 +37,6 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, sidebarItems,
     <div className="min-h-screen bg-gray-50 transition-colors duration-300">
       <Header
         user={user}
-        onLogout={handleLogoutClick}
         toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onProfileClick={onProfileClick}
       />
@@ -45,8 +45,11 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, sidebarItems,
           items={sidebarItems}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onLogout={handleLogoutClick}
         />
-        <main className="flex-1 lg:ml-80 p-4 lg:p-8 pt-20 lg:pt-24 transition-all duration-300">
+        <main className={`flex-1 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80'} p-2 sm:p-4 lg:p-8 pt-20 lg:pt-24 transition-all duration-300 w-full overflow-x-hidden`}>
           {children}
         </main>
       </div>

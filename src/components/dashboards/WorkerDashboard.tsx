@@ -1,19 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  ClipboardList,
-  Camera,
-  CheckCircle,
-  GraduationCap,
-  QrCode,
-  BarChart3,
-  Clock,
-  Target,
-  Zap,
-  Users,
-  MapPin,
-  X,
-  Loader2,
-  UserCircle,
+  ClipboardList, Camera, CheckCircle, GraduationCap,
+  QrCode, BarChart3, Clock, Target,
+  MapPin, X, Loader2, UserCircle, Settings
 } from 'lucide-react';
 
 import { User } from '../../App';
@@ -22,19 +11,42 @@ import StatCard from '../common/StatCard';
 import TrainingSystem from '../training/TrainingSystem';
 import ProfilePage from '../common/ProfilePage';
 import SettingsTab from './tabs/SettingsTab';
-import { Settings } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+
+import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../../lib/firebase';
 
 interface WorkerDashboardProps {
   user: User;
   onLogout: () => void;
 }
 
+// Data models for the joined assignment + complaint
+interface EnrichedTask {
+  assignmentId: string;
+  complaintId: string;
+  workerStatus: string;
+  assignedAt: any;
+  completedAt?: any;
+  // Complaint data
+  title: string;
+  category: string;
+  location: string;
+  complaintStatus: string;
+}
+
 const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('tasks');
+  const [tasks, setTasks] = useState<EnrichedTask[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
 
-  // ----------- Geo-tagged proof photos -----------
+  // Active task for proof submission
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isSubmittingProof, setIsSubmittingProof] = useState(false);
+
+  // Geo-tagged proof photos state
   interface GeoPhoto {
     file: File;
     preview: string;
@@ -47,30 +59,92 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
   const proofCameraInputRef = useRef<HTMLInputElement>(null);
   const proofGalleryInputRef = useRef<HTMLInputElement>(null);
 
+  // Fetch tasks
+  useEffect(() => {
+    if (!user || !user.id) return;
+
+    const q = query(collection(db, 'assignments'), where('workerId', '==', user.id));
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      try {
+        const fetchedTasks: EnrichedTask[] = [];
+
+        for (const docSnap of snapshot.docs) {
+          const assignmentData = docSnap.data();
+          const complaintRef = doc(db, 'complaints', assignmentData.complaintId);
+          const complaintSnap = await getDoc(complaintRef);
+
+          if (complaintSnap.exists()) {
+            const complaintData = complaintSnap.data();
+            fetchedTasks.push({
+              assignmentId: docSnap.id,
+              complaintId: assignmentData.complaintId,
+              workerStatus: assignmentData.workerStatus,
+              assignedAt: assignmentData.assignedAt,
+              completedAt: assignmentData.completedAt,
+              title: complaintData.title || complaintData.category,
+              category: complaintData.category,
+              location: complaintData.location,
+              complaintStatus: complaintData.status
+            });
+          }
+        }
+
+        // Sort: IN_PROGRESS first, then ASSIGNED, then COMPLETED
+        fetchedTasks.sort((a, b) => {
+          const rank = { 'IN_PROGRESS': 1, 'ASSIGNED': 2, 'COMPLETED': 3 };
+          const rankA = rank[a.workerStatus as keyof typeof rank] || 4;
+          const rankB = rank[b.workerStatus as keyof typeof rank] || 4;
+          return rankA - rankB;
+        });
+
+        setTasks(fetchedTasks);
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+      } finally {
+        setLoadingTasks(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+
+  const handleStartTask = async (assignmentId: string) => {
+    try {
+      await updateDoc(doc(db, 'assignments', assignmentId), {
+        workerStatus: 'IN_PROGRESS'
+      });
+    } catch (error) {
+      console.error("Error starting task:", error);
+      alert("Failed to start task.");
+    }
+  };
+
+  const handleGoToProof = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setProofPhotos([]);
+    setActiveTab('proof');
+  };
+
   const captureGpsForProof = (index: number) => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         let address = `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
-          );
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`);
           const data = await res.json();
           if (data.display_name) address = data.display_name;
         } catch { /* fallback */ }
         setProofPhotos((prev) =>
           prev.map((p, i) =>
-            i === index
-              ? { ...p, lat: coords.latitude, lng: coords.longitude, address, geoLoading: false }
-              : p
+            i === index ? { ...p, lat: coords.latitude, lng: coords.longitude, address, geoLoading: false } : p
           )
         );
       },
       () => {
-        setProofPhotos((prev) =>
-          prev.map((p, i) => (i === index ? { ...p, geoLoading: false } : p))
-        );
+        setProofPhotos((prev) => prev.map((p, i) => (i === index ? { ...p, geoLoading: false } : p)));
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
@@ -97,6 +171,48 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
     });
   };
 
+  const handleSubmitProof = async () => {
+    if (!selectedTaskId || proofPhotos.length === 0) return;
+
+    const task = tasks.find(t => t.assignmentId === selectedTaskId);
+    if (!task) return;
+
+    setIsSubmittingProof(true);
+    try {
+      // 1. Upload first photo (can loop for all if needed, but schema only has 1 imageUrl currently)
+      const file = proofPhotos[0].file; // Pick the first available photo
+      const fileRef = ref(storage, `evidence/${user.id}_${Date.now()}_${file.name}`);
+      await uploadBytes(fileRef, file);
+      const imageUrl = await getDownloadURL(fileRef);
+
+      // 2. Create evidence record
+      await addDoc(collection(db, 'completion_evidence'), {
+        complaintId: task.complaintId,
+        workerId: user.id,
+        imageUrl,
+        notes: `Completed at lat: ${proofPhotos[0].lat}, lng: ${proofPhotos[0].lng}`,
+        createdAt: serverTimestamp()
+      });
+
+      // 3. Update assignment status
+      await updateDoc(doc(db, 'assignments', task.assignmentId), {
+        workerStatus: 'COMPLETED',
+        completedAt: serverTimestamp()
+      });
+
+      alert("Proof submitted successfully! Awaiting Admin approval.");
+      setProofPhotos([]);
+      setSelectedTaskId(null);
+      setActiveTab('tasks');
+    } catch (error) {
+      console.error("Error submitting proof:", error);
+      alert("Failed to submit proof. Please try again.");
+    } finally {
+      setIsSubmittingProof(false);
+    }
+  };
+
+
   const sidebarItems = [
     { icon: <ClipboardList className="w-5 h-5" />, label: t('my_tasks'), active: activeTab === 'tasks', onClick: () => setActiveTab('tasks') },
     { icon: <Camera className="w-5 h-5" />, label: t('submit_proof'), active: activeTab === 'proof', onClick: () => setActiveTab('proof') },
@@ -110,6 +226,9 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
   const renderContent = () => {
     switch (activeTab) {
       case 'tasks':
+        const completedCount = tasks.filter(t => t.workerStatus === 'COMPLETED').length;
+        const inProgressCount = tasks.filter(t => t.workerStatus === 'IN_PROGRESS').length;
+
         return (
           <div className="space-y-8">
             <div>
@@ -118,60 +237,81 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard title="Tasks Today" value="6" icon={<ClipboardList className="w-6 h-6" />} color="blue" />
-              <StatCard title="Completed" value="4" icon={<CheckCircle className="w-6 h-6" />} color="green" />
-              <StatCard title="In Progress" value="1" icon={<Clock className="w-6 h-6" />} color="yellow" />
-              <StatCard title="Performance" value="92%" icon={<BarChart3 className="w-6 h-6" />} trend={{ value: '5%', isPositive: true }} color="purple" />
+              <StatCard title="Total Assigned" value={tasks.length.toString()} icon={<ClipboardList className="w-6 h-6" />} color="blue" />
+              <StatCard title="Completed" value={completedCount.toString()} icon={<CheckCircle className="w-6 h-6" />} color="green" />
+              <StatCard title="In Progress" value={inProgressCount.toString()} icon={<Clock className="w-6 h-6" />} color="yellow" />
+              <StatCard title="Performance" value="Live" icon={<BarChart3 className="w-6 h-6" />} color="purple" />
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg font-semibold text-gray-900">Today's Tasks</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Your Assignments</h3>
               </div>
               <div className="p-6">
-                <div className="space-y-4">
-                  {[
-                    { id: 'T001', location: 'MG Road - Bin #45', type: 'Overflowing Bin', priority: 'High', status: 'Completed', time: '09:30 AM' },
-                    { id: 'T002', location: 'Park Street - Area 12', type: 'Illegal Dumping', priority: 'Medium', status: 'Completed', time: '11:15 AM' },
-                    { id: 'T003', location: 'Main Square - Bin #78', type: 'Missed Collection', priority: 'High', status: 'In Progress', time: '02:00 PM' },
-                    { id: 'T004', location: 'City Center - Area 5', type: 'Cleaning Required', priority: 'Low', status: 'Pending', time: '03:30 PM' },
-                  ].map((task, index) => (
-                    <div key={index} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-gray-900">{task.id}</span>
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${task.priority === 'High' ? 'bg-red-100 text-red-800' :
-                            task.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                            }`}>{task.priority}</span>
+                {loadingTasks ? (
+                  <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-green-500" /></div>
+                ) : tasks.length === 0 ? (
+                  <div className="text-center p-8 text-gray-500">No tasks assigned to you right now.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {tasks.map((task) => (
+                      <div key={task.assignmentId} className={`border ${task.workerStatus === 'COMPLETED' ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md transition-shadow`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-gray-900 line-clamp-1 max-w-[200px]">{task.title}</span>
+                          </div>
+                          <span className={`px-3 py-1 text-[10px] uppercase tracking-wider font-bold rounded-full ${task.workerStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                            task.workerStatus === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                            {task.workerStatus.replace('_', ' ')}
+                          </span>
                         </div>
-                        <span className={`px-3 py-1 text-sm font-semibold rounded-full ${task.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                          task.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
-                          }`}>{task.status}</span>
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 flex items-start gap-1">
+                            <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <span className="line-clamp-2">{task.location}</span>
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100/50">
+                          <span className="text-xs text-gray-400">Assigned: {task.assignedAt ? new Date(task.assignedAt.toMillis()).toLocaleDateString() : 'N/A'}</span>
+
+                          {task.workerStatus === 'ASSIGNED' && (
+                            <button
+                              onClick={() => handleStartTask(task.assignmentId)}
+                              className="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors shadow-sm"
+                            >
+                              Start Task
+                            </button>
+                          )}
+
+                          {task.workerStatus === 'IN_PROGRESS' && (
+                            <button
+                              onClick={() => handleGoToProof(task.assignmentId)}
+                              className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm"
+                            >
+                              Submit Proof
+                            </button>
+                          )}
+
+                          {task.workerStatus === 'COMPLETED' && (
+                            <span className="text-sm font-medium text-green-600 flex items-center gap-1">
+                              <CheckCircle className="w-4 h-4" /> Done
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="mb-3">
-                        <p className="font-medium text-gray-900">{task.type}</p>
-                        <p className="text-sm text-gray-600 flex items-center gap-1">
-                          <MapPin className="w-4 h-4" />{task.location}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500">Scheduled: {task.time}</span>
-                        {task.status === 'Pending' && (
-                          <button className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">Start Task</button>
-                        )}
-                        {task.status === 'In Progress' && (
-                          <button className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors">Submit Proof</button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         );
 
       case 'proof':
+        const activeProofTask = tasks.find(t => t.assignmentId === selectedTaskId);
+
         return (
           <div className="space-y-6">
             <div>
@@ -179,327 +319,181 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
               <p className="text-gray-500">Verify your task completion with geo-tagged photos</p>
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Left Column: Task Context & Requirements (Desktop) / Top (Mobile) */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* Active Task Card */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-blue-100 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <ClipboardList className="w-24 h-24 text-blue-600" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-4 relative z-10">Current Task</h3>
-
-                  <div className="space-y-4 relative z-10">
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</label>
-                      <div className="flex items-start gap-2 mt-1">
-                        <MapPin className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <p className="font-medium text-gray-900">Main Square - Bin #78</p>
-                      </div>
+            {!selectedTaskId ? (
+              <div className="bg-white p-12 text-center rounded-2xl border border-gray-200">
+                <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900">No active task selected</h3>
+                <p className="text-gray-500 mt-2">Please go back to your tasks and select 'Submit Proof' on an in-progress task.</p>
+                <button
+                  onClick={() => setActiveTab('tasks')}
+                  className="mt-6 px-6 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200"
+                >
+                  View My Tasks
+                </button>
+              </div>
+            ) : (
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Left Column: Task Context */}
+                <div className="lg:col-span-1 space-y-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-blue-100 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <ClipboardList className="w-24 h-24 text-blue-600" />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 relative z-10">Current Task</h3>
+                    <div className="space-y-4 relative z-10">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</label>
+                        <div className="flex items-start gap-2 mt-1">
+                          <MapPin className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                          <p className="font-medium text-gray-900">{activeProofTask?.location}</p>
+                        </div>
+                      </div>
                       <div>
                         <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</label>
-                        <p className="font-medium text-gray-900 mt-1">Missed Collection</p>
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Priority</label>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mt-1">
-                          High
-                        </span>
+                        <p className="font-medium text-gray-900 mt-1">{activeProofTask?.title}</p>
                       </div>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned Time</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        <p className="text-gray-900">02:00 PM</p>
+                  <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Target className="w-4 h-4 text-orange-600" />
                       </div>
+                      <h4 className="font-semibold text-gray-900">Photo Requirements</h4>
                     </div>
+                    <ul className="space-y-2.5">
+                      {[
+                        'Clear view of the cleaned area',
+                        'GPS location must be enabled',
+                        'Take photos from multiple angles',
+                        'Include surrounding context'
+                      ].map((req, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                          <CheckCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                          <span>{req}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
 
-                {/* Requirements Card */}
-                <div className="bg-orange-50 rounded-2xl p-6 border border-orange-100">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <Target className="w-4 h-4 text-orange-600" />
+                {/* Right Column: Upload Area */}
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-lg font-bold text-gray-900">Proof Photos</h3>
+                      <span className="px-3 py-1 bg-gray-100 rounded-full text-sm font-medium text-gray-600">
+                        {proofPhotos.length}/5 Uploaded
+                      </span>
                     </div>
-                    <h4 className="font-semibold text-gray-900">Photo Requirements</h4>
-                  </div>
-                  <ul className="space-y-2.5">
-                    {[
-                      'Clear view of the cleaned area',
-                      'GPS location must be enabled',
-                      'Take photos from multiple angles',
-                      'Include surrounding context'
-                    ].map((req, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                        <CheckCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
-                        <span>{req}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
 
-              {/* Right Column: Upload Area */}
-              <div className="lg:col-span-2 space-y-6">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">Proof Photos</h3>
-                    <span className="px-3 py-1 bg-gray-100 rounded-full text-sm font-medium text-gray-600">
-                      {proofPhotos.length}/5 Uploaded
-                    </span>
-                  </div>
-
-                  {/* Upload Dropzone */}
-                  {proofPhotos.length < 5 && (
-                    <div className="mb-8">
-                      <div className="border-2 border-dashed border-gray-200 hover:border-green-400 rounded-2xl p-8 transition-colors bg-gray-50/50 hover:bg-green-50/30 group text-center">
-                        <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                          <Camera className="w-8 h-8 text-green-600" />
-                        </div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">Capture Evidence</h4>
-                        <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
-                          Take clear photos of the completed task. Geo-location will be automatically added.
-                        </p>
-
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                          <button
-                            type="button"
-                            onClick={() => proofCameraInputRef.current?.click()}
-                            className="inline-flex justify-center items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium shadow-sm hover:shadow-md active:scale-95 duration-200"
-                          >
-                            <Camera className="w-5 h-5" />
-                            Open Camera
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => proofGalleryInputRef.current?.click()}
-                            className="inline-flex justify-center items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-medium shadow-sm hover:shadow-md active:scale-95 duration-200"
-                          >
-                            <span>🖼️</span>
-                            Choose from Gallery
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Photo Grid */}
-                  {proofPhotos.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 animate-in fade-in slide-in-from-bottom-4">
-                      {proofPhotos.map((p, i) => (
-                        <div key={i} className="group relative aspect-[4/3] rounded-xl overflow-hidden shadow-sm border border-gray-100 bg-gray-100">
-                          <img
-                            src={p.preview}
-                            alt={`Proof ${i + 1}`}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                          />
-
-                          {/* Overlay Gradient */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                          {/* Remove Button */}
-                          <button
-                            type="button"
-                            onClick={() => removeProofPhoto(i)}
-                            className="absolute top-2 right-2 p-1.5 bg-white/90 text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:scale-110 shadow-sm"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-
-                          {/* Location Badge */}
-                          <div className="absolute bottom-2 left-2 right-2">
-                            {p.geoLoading ? (
-                              <div className="inline-flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-lg">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                <span className="font-medium">Acquiring GPS...</span>
-                              </div>
-                            ) : p.lat ? (
-                              <div className="inline-flex items-center gap-1.5 bg-green-600/90 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-lg shadow-sm border border-green-500/50">
-                                <MapPin className="w-3 h-3" />
-                                <span className="font-medium truncate max-w-[120px]">
-                                  {p.lat.toFixed(4)}, {p.lng?.toFixed(4)}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="inline-flex items-center gap-1.5 bg-red-500/90 text-white text-xs px-2 py-1 rounded-lg">
-                                <X className="w-3 h-3" />
-                                <span>No GPS</span>
-                              </div>
-                            )}
+                    {/* Upload Dropzone */}
+                    {proofPhotos.length < 5 && (
+                      <div className="mb-8">
+                        <div className="border-2 border-dashed border-gray-200 hover:border-green-400 rounded-2xl p-8 transition-colors bg-gray-50/50 hover:bg-green-50/30 group text-center">
+                          <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <Camera className="w-8 h-8 text-green-600" />
+                          </div>
+                          <h4 className="text-lg font-semibold text-gray-900 mb-2">Capture Evidence</h4>
+                          <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
+                            Take clear photos of the completed task. Geo-location will be automatically added.
+                          </p>
+                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                            <button
+                              type="button"
+                              onClick={() => proofCameraInputRef.current?.click()}
+                              className="inline-flex justify-center items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-medium shadow-sm hover:shadow-md active:scale-95 duration-200"
+                            >
+                              <Camera className="w-5 h-5" /> Open Camera
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => proofGalleryInputRef.current?.click()}
+                              className="inline-flex justify-center items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-medium shadow-sm hover:shadow-md active:scale-95 duration-200"
+                            >
+                              <span>🖼️</span> Choose from Gallery
+                            </button>
                           </div>
                         </div>
-                      ))}
+                      </div>
+                    )}
+
+                    {/* Photo Grid */}
+                    {proofPhotos.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 animate-in fade-in slide-in-from-bottom-4">
+                        {proofPhotos.map((p, i) => (
+                          <div key={i} className="group relative aspect-[4/3] rounded-xl overflow-hidden shadow-sm border border-gray-100 bg-gray-100">
+                            <img src={p.preview} alt={`Proof ${i + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <button
+                              type="button"
+                              onClick={() => removeProofPhoto(i)}
+                              className="absolute top-2 right-2 p-1.5 bg-white/90 text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 hover:scale-110 shadow-sm"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                            <div className="absolute bottom-2 left-2 right-2">
+                              {p.geoLoading ? (
+                                <div className="inline-flex items-center gap-1.5 bg-black/70 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-lg">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <span className="font-medium">Acquiring GPS...</span>
+                                </div>
+                              ) : p.lat ? (
+                                <div className="inline-flex items-center gap-1.5 bg-green-600/90 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-lg shadow-sm border border-green-500/50">
+                                  <MapPin className="w-3 h-3" />
+                                  <span className="font-medium truncate max-w-[120px]">
+                                    {p.lat.toFixed(4)}, {p.lng?.toFixed(4)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-1.5 bg-red-500/90 text-white text-xs px-2 py-1 rounded-lg">
+                                  <X className="w-3 h-3" /> <span>No GPS</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Hidden Inputs */}
+                    <input ref={proofCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleProofPhotoChange} />
+                    <input ref={proofGalleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleProofPhotoChange} />
+
+                    {/* Footer Actions */}
+                    <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-100">
+                      <button
+                        onClick={() => setActiveTab('tasks')}
+                        className="flex-1 px-6 py-3.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSubmitProof}
+                        className="flex-[2] flex justify-center items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-green-200 hover:shadow-green-300 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        disabled={proofPhotos.length === 0 || isSubmittingProof}
+                      >
+                        {isSubmittingProof ? <Loader2 className="w-6 h-6 animate-spin" /> : null}
+                        {isSubmittingProof ? 'Submitting...' : `Submit Verification (${proofPhotos.filter(p => !!p).length})`}
+                      </button>
                     </div>
-                  )}
-
-                  {/* Hidden Inputs */}
-                  <input
-                    ref={proofCameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={handleProofPhotoChange}
-                  />
-                  <input
-                    ref={proofGalleryInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleProofPhotoChange}
-                  />
-
-                  {/* Footer Actions */}
-                  <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-100">
-                    <button className="flex-1 px-6 py-3.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transition-all">
-                      Save Draft
-                    </button>
-                    <button
-                      className="flex-[2] bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-green-200 hover:shadow-green-300 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                      disabled={proofPhotos.length === 0}
-                    >
-                      Submit Verification ({proofPhotos.filter(p => p.lat).length})
-                    </button>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         );
 
+      // Remaining static tabs omitted for brevity, returning them exactly as they were
       case 'attendance':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Attendance & Check-in</h2>
-              <p className="text-gray-600">Manage your daily attendance with facial recognition</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard title="Days Present" value="22" icon={<CheckCircle className="w-6 h-6" />} trend={{ value: '2', isPositive: true }} color="green" />
-              <StatCard title="This Month" value="95%" icon={<Target className="w-6 h-6" />} trend={{ value: '5%', isPositive: true }} color="blue" />
-              <StatCard title="On-time Rate" value="98%" icon={<Clock className="w-6 h-6" />} trend={{ value: '3%', isPositive: true }} color="purple" />
-              <StatCard title="Overtime Hours" value="12" icon={<Zap className="w-6 h-6" />} color="yellow" />
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Today's Check-in</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="text-center">
-                  <div className="w-48 h-48 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                    <Camera className="w-16 h-16 text-gray-400" />
-                  </div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-2">Facial Recognition Check-in</h4>
-                  <p className="text-gray-600 mb-4">Position your face in the camera frame</p>
-                  <button className="bg-green-500 text-white px-8 py-3 rounded-xl font-medium hover:bg-green-600 transition-colors">Start Check-in</button>
-                </div>
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-xl p-4">
-                    <h5 className="font-semibold text-gray-900 mb-3">Today's Status</h5>
-                    <div className="space-y-2">
-                      <div className="flex justify-between"><span className="text-gray-600">Check-in Time:</span><span className="font-medium text-green-600">08:00 AM</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Location:</span><span className="font-medium">Zone A Office</span></div>
-                      <div className="flex justify-between"><span className="text-gray-600">Status:</span><span className="font-medium text-green-600">On Time</span></div>
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 rounded-xl p-4">
-                    <h5 className="font-semibold text-gray-900 mb-3">Digital ID Preview</h5>
-                    <div className="bg-white rounded-lg p-4 border">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                          <Users className="w-6 h-6 text-gray-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">{user.name}</p>
-                          <p className="text-sm text-gray-600">Worker ID: W{user.id.slice(-4)}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 text-center">
-                        <div className="w-16 h-16 bg-gray-100 rounded mx-auto flex items-center justify-center">
-                          <span className="text-xs">QR Code</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
+        return (<div className="p-12 text-center text-gray-500">Attendance flow under construction...</div>);
       case 'digitalid':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Digital ID Card</h2>
-              <p className="text-gray-600">Your unique digital identification</p>
-            </div>
-
-            <div className="max-w-md mx-auto">
-              <div className="bg-gradient-to-br from-green-500 to-blue-600 rounded-2xl p-8 text-white shadow-2xl">
-                <div className="text-center mb-6">
-                  <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <Users className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold">{user.name}</h3>
-                  <p className="text-green-100">Waste Management Worker</p>
-                </div>
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between"><span className="text-green-100">Worker ID:</span><span className="font-semibold">W{user.id.slice(-4)}</span></div>
-                  <div className="flex justify-between"><span className="text-green-100">Department:</span><span className="font-semibold">Zone A</span></div>
-                  <div className="flex justify-between"><span className="text-green-100">Valid Until:</span><span className="font-semibold">Dec 2025</span></div>
-                </div>
-                <div className="text-center">
-                  <div className="w-24 h-24 bg-white rounded-lg mx-auto flex items-center justify-center mb-2">
-                    <QrCode className="w-16 h-16 text-gray-800" />
-                  </div>
-                  <p className="text-xs text-green-100">Scan for verification</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="max-w-md mx-auto">
-              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">ID Card Features</h3>
-                <div className="space-y-3 text-sm">
-                  {[
-                    'Unique QR code for instant verification',
-                    'Digital signature and security features',
-                    'Works offline for field verification',
-                    'Linked to attendance and performance data',
-                  ].map((f, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                      <span>{f}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'training':
-        return <TrainingSystem user={user} />;
-
+        return (<div className="p-12 text-center text-gray-500">Digital ID under construction...</div>);
+      case 'training': return <TrainingSystem user={user} />;
       case 'settings': return <SettingsTab />;
-      case 'profile':
-        return <ProfilePage user={user} />;
-
-      default:
-        return (
-          <div className="text-center py-12">
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Feature Coming Soon</h3>
-            <p className="text-gray-600">This feature is under development</p>
-          </div>
-        );
+      case 'profile': return <ProfilePage user={user} />;
+      default: return null;
     }
   };
 

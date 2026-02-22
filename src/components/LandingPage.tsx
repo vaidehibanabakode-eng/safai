@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    ArrowRight, Leaf, BarChart3, Users, Shield, Menu, X, Globe,
+    ArrowRight, BarChart3, Users, Shield, Menu, X, Globe,
     Recycle, Download, MapPin, Bell, CheckCircle, Zap, Star,
     ChevronDown, Smartphone, Lock, TrendingUp,
 } from 'lucide-react';
@@ -153,12 +153,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                 <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
                     {/* Logo */}
                     <div onClick={() => scrollTo('hero')} className="flex items-center gap-2.5 cursor-pointer group">
-                        <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                            <Leaf className="w-5 h-5 text-white" />
-                        </div>
-                        <span className="text-xl font-extrabold tracking-tight text-gray-900">
-                            Safai<span className="text-emerald-600">Connect</span>
-                        </span>
+                        <img src="/logo.png" alt="Safai Connect Logo" className="h-10 w-auto object-contain group-hover:scale-105 transition-transform" />
                     </div>
 
                     {/* Desktop links */}
@@ -405,11 +400,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                 <div className="container mx-auto md:px-8">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
                         <div>
-                            <div className="flex items-center gap-2 mb-6">
-                                <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
-                                    <Leaf className="w-5 h-5 text-white" />
-                                </div>
-                                <span className="font-extrabold text-xl text-gray-900">Safai<span className="text-emerald-600">Connect</span></span>
+                            <div className="flex items-center gap-2 mb-6 cursor-pointer" onClick={() => scrollTo('hero')}>
+                                <img src="/logo.png" alt="Safai Connect Logo" className="h-10 w-auto object-contain" />
                             </div>
                             <p className="text-gray-500 text-sm leading-relaxed">
                                 {t('footer_tagline')}

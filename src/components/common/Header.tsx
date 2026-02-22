@@ -1,22 +1,21 @@
 import React from 'react';
-import { Menu, LogOut, Bell, User as UserIcon, Recycle } from 'lucide-react';
+import { Menu, Bell, User as UserIcon } from 'lucide-react';
 import { User } from '../../App';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 interface HeaderProps {
   user: User;
-  onLogout: () => void;
   toggleSidebar?: () => void;
   onProfileClick?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onProfileClick }) => {
+const Header: React.FC<HeaderProps> = ({ user, toggleSidebar, onProfileClick }) => {
   const { t } = useLanguage();
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30 transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-4">
             <button
               onClick={toggleSidebar}
@@ -24,24 +23,17 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onProfil
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="flex items-center gap-2 transition-transform hover:scale-105 duration-300">
-              <div className="bg-green-600 p-2 rounded-lg shadow-lg shadow-green-200">
-                <Recycle className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-green-700 to-green-500 bg-clip-text text-transparent">
-                  Safai <span className="text-2xl font-extrabold text-green-600">कनेक्ट</span>
-                </h1>
-              </div>
+            <div className="flex items-center gap-1 sm:gap-2 transition-transform hover:scale-105 duration-300">
+              <img src="/logo.png" alt="Safai Connect Logo" className="h-8 sm:h-10 w-auto object-contain drop-shadow-sm" />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 ml-auto">
             <LanguageSwitcher />
 
-            <button className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors relative group">
+            <button className="p-1 sm:p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors relative group">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+              <span className="absolute top-1 sm:top-2 right-1 sm:right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
 
             <div
@@ -56,14 +48,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, toggleSidebar, onProfil
                 <UserIcon className="w-5 h-5 text-green-600" />
               </div>
             </div>
-
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors ml-2"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('logout')}</span>
-            </button>
           </div>
         </div>
       </div>
