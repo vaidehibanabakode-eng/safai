@@ -4,7 +4,6 @@ import LoginPage from './components/LoginPage';
 import SignupPage from './components/SignupPage';
 import SuperadminDashboard from './components/dashboards/SuperadminDashboard';
 import AdminDashboard from './components/dashboards/AdminDashboard';
-// import GreenChampionDashboard from './components/dashboards/GreenChampionDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
 import CitizenDashboard from './components/dashboards/CitizenDashboard';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -45,16 +44,12 @@ function App() {
     localStorage.setItem(LS_VIEW_KEY, view);
   };
 
-  const [localAuthFallback, setLocalAuthFallback] = useState<User | null>(null);
-
-  const handleLogin = (user: User) => {
-    // TEMPORARY FALLBACK: keep passing prop until we remove all local states
-    setLocalAuthFallback(user);
-    handleSetView('login');
+  const handleLogin = () => {
+    // Login is handled entirely by Firebase/AuthContext now
+    // No more localAuthFallback — the role comes from Firestore via AuthContext
   };
 
   const handleLogout = async () => {
-    setLocalAuthFallback(null);
     try {
       await signOut(auth);
     } catch (error) {
@@ -63,32 +58,20 @@ function App() {
     handleSetView('landing');
   };
 
-  // Active User object to pass to dashboards (compat bridge)
-  const activeUser: User | null = userProfile ? {
-    id: userProfile.uid,
-    email: userProfile.email,
-    name: userProfile.name,
-    role: userProfile.role.toLowerCase() as UserRole,
-    phone: userProfile.phone,
-    address: userProfile.address,
-    citizenID: userProfile.citizenID,
-    assignedZone: userProfile.assignedZone || userProfile.area,
-    preferences: userProfile.preferences,
-  } : localAuthFallback;
-
-  // Only show loading spinner if AuthContext is explicitly loading
-  // Or if we have a Firebase user but haven't resolved their activeUser profile yet
-  const isProfilePending = currentUser && !activeUser && !loading;
-
-  if (loading || isProfilePending) {
+  // Show loading spinner while Firebase resolves the auth state
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 text-sm">Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
 
-  if (!currentUser && !localAuthFallback) {
+  // If not logged in, show public pages
+  if (!currentUser) {
     switch (currentView) {
       case 'login':
         return (
@@ -113,44 +96,68 @@ function App() {
     }
   }
 
-  const renderDashboard = () => {
-    if (!activeUser) {
-      // If we are logged out or missing profile data, fallback gracefully to login
-      return (
-        <LoginPage
-          onLogin={handleLogin}
-          onNavigateToSignup={() => handleSetView('signup')}
-          onBack={() => handleSetView('landing')}
-        />
-      );
-    }
+  // Logged in but Firestore profile not loaded yet
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 text-sm">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
 
-    switch (activeUser.role) {
-      case 'superadmin':
-        return <SuperadminDashboard user={activeUser} onLogout={handleLogout} />;
-      case 'admin':
-        return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
-      case 'worker':
-        return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
-      case 'citizen':
-        return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
-      default:
-        // Fallback safety
-        handleLogout();
-        return (
-          <LoginPage
-            onLogin={handleLogin}
-            onNavigateToSignup={() => handleSetView('signup')}
-            onBack={() => handleSetView('landing')}
-          />
-        );
+  // Build the activeUser from Firestore profile — this is the ONLY source of truth for role
+
+  const activeUser: User = {
+    id: userProfile.uid,
+    email: userProfile.email,
+    name: userProfile.name,
+    // Normalize role to lowercase
+    role: (userProfile.role?.toLowerCase() || 'citizen') as UserRole,
+    phone: userProfile.phone,
+    address: userProfile.address,
+    citizenID: userProfile.citizenID,
+    assignedZone: userProfile.assignedZone || userProfile.area,
+    preferences: userProfile.preferences,
+  };
+
+  // Debug logging
+  console.log('🔍 Firestore Role:', userProfile.role);
+  console.log('🔍 Normalized Role:', activeUser.role);
+  console.log('🔍 Full User Profile:', userProfile);
+
+  const renderDashboard = () => {
+    console.log('🎯 Rendering dashboard for role:', activeUser.role);
+    console.log('🎯 Role type:', typeof activeUser.role);
+    console.log('🎯 Active User:', activeUser);
+    
+    // Force re-evaluation
+    if (activeUser.role === 'superadmin') {
+      console.log('✅ Matched SUPERADMIN');
+      return <SuperadminDashboard user={activeUser} onLogout={handleLogout} />;
+    } else if (activeUser.role === 'admin') {
+      console.log('✅ Matched ADMIN');
+      return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
+    } else if (activeUser.role === 'worker') {
+      console.log('✅ Matched WORKER');
+      return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
+    } else if (activeUser.role === 'citizen') {
+      console.log('✅ Matched CITIZEN');
+      return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
+    } else {
+      console.log('❌ NO MATCH - defaulting to CITIZEN. Role:', activeUser.role);
+      return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
     }
   };
 
   return (
     <ThemeProvider>
       <div className="min-h-screen bg-gray-50 transition-colors duration-300">
-        {renderDashboard()}
+        <div>
+          {renderDashboard()}
+        </div>
       </div>
     </ThemeProvider>
   );

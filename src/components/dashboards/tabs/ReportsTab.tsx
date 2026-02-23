@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     FileText,
     Download,
     Calendar,
-    Filter,
     BarChart3,
     TrendingUp,
     AlertTriangle,
@@ -14,16 +13,38 @@ import {
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 
 const ReportsTab: React.FC = () => {
     const { t } = useLanguage();
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        total: 0,
+        resolved: 0,
+        critical: 0,
+        resolutionRate: '0%'
+    });
 
-    const zones = [
-        { name: 'Zone A', complaints: 145, resolved: 140, avgTime: '2.5h', satisfaction: '4.8/5', status: 'Excellent' },
-        { name: 'Zone B', complaints: 89, resolved: 85, avgTime: '3.1h', satisfaction: '4.5/5', status: 'Good' },
-        { name: 'Zone C', complaints: 210, resolved: 180, avgTime: '4.2h', satisfaction: '3.9/5', status: 'Average' },
-        { name: 'Zone D', complaints: 65, resolved: 65, avgTime: '1.8h', satisfaction: '4.9/5', status: 'Excellent' },
-    ];
+    useEffect(() => {
+        const q = query(collection(db, 'complaints'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const all = snapshot.docs;
+            const resolved = all.filter(d => d.data().status === 'RESOLVED').length;
+            const critical = all.filter(d => d.data().priority === 'HIGH' || d.data().priority === 'URGENT').length;
+            const rate = all.length > 0 ? ((resolved / all.length) * 100).toFixed(1) + '%' : '0%';
+
+            setStats({
+                total: all.length,
+                resolved,
+                critical,
+                resolutionRate: rate
+            });
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -50,96 +71,62 @@ const ReportsTab: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard
                     title={t('total_complaints')}
-                    value="1,245"
+                    value={loading ? "..." : stats.total.toString()}
                     icon={<FileText className="w-6 h-6" />}
-                    trend={{ value: "12%", isPositive: true }}
+                    trend={{ value: "Live", isPositive: true }}
                     color="blue"
                 />
                 <StatCard
                     title={t('resolution_rate')}
-                    value="94.2%"
+                    value={loading ? "..." : stats.resolutionRate}
                     icon={<CheckCircle className="w-6 h-6" />}
-                    trend={{ value: "4.1%", isPositive: true }}
+                    trend={{ value: "Live", isPositive: true }}
                     color="green"
                 />
                 <StatCard
                     title={t('avg_response_time')}
-                    value="2h 15m"
+                    value="—"
                     icon={<Clock className="w-6 h-6" />}
-                    trend={{ value: "15m", isPositive: true }}
                     color="purple"
                 />
                 <StatCard
                     title={t('critical_issues')}
-                    value="12"
+                    value={loading ? "..." : stats.critical.toString()}
                     icon={<AlertTriangle className="w-6 h-6" />}
-                    trend={{ value: "2", isPositive: false }}
                     color="red"
                 />
             </div>
 
-            {/* Zone Performance Table */}
+            {/* Zone Performance Table Placeholder */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                     <div className="flex items-center gap-2">
                         <MapPin className="w-5 h-5 text-gray-500" />
                         <h3 className="text-lg font-bold text-gray-900">{t('zone_performance_analytics')}</h3>
                     </div>
-                    <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-                        <Filter className="w-5 h-5" />
-                    </button>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[800px]">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('zone_name')}</th>
-                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('complaints_label')}</th>
-                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('resolved_label')}</th>
-                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('avg_time_label')}</th>
-                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('satisfaction_label')}</th>
-                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('health_status')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {zones.map((zone, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="font-semibold text-gray-900">{zone.name}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center text-gray-700">{zone.complaints}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center text-emerald-600 font-medium">{zone.resolved}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center text-gray-600">{zone.avgTime}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center font-medium text-gray-900">⭐ {zone.satisfaction}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${zone.status === 'Excellent' ? 'bg-green-100 text-green-700' :
-                                            zone.status === 'Good' ? 'bg-blue-100 text-blue-700' :
-                                                'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                            {/* Translate status dynamically */}
-                                            {zone.status === 'Excellent' ? t('status_excellent') :
-                                                zone.status === 'Good' ? t('status_good') :
-                                                    t('status_average')}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="p-12 text-center">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+                        <BarChart3 className="w-8 h-8 text-gray-300" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-1">{t('chart_unavailable')}</h4>
+                    <p className="text-gray-500 max-w-sm mx-auto">
+                        Detailed zone-wise analytics are being processed. Regional performance data will appear here as more complaints are localized.
+                    </p>
                 </div>
             </div>
 
-            {/* Charts Row Placeholder (Visual only for now) */}
+            {/* Charts Row Placeholder */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm min-h-[300px] flex flex-col items-center justify-center text-center">
-                    <BarChart3 className="w-16 h-16 text-gray-300 mb-4" />
+                <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm min-h-[300px] flex flex-col items-center justify-center text-center">
+                    <BarChart3 className="w-12 h-12 text-gray-200 mb-4" />
                     <h3 className="text-gray-900 font-semibold text-lg">{t('weekly_complaint_volume')}</h3>
-                    <p className="text-gray-500">{t('chart_unavailable')}</p>
+                    <p className="text-gray-400 text-sm mt-1">{t('chart_unavailable')}</p>
                 </div>
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm min-h-[300px] flex flex-col items-center justify-center text-center">
-                    <TrendingUp className="w-16 h-16 text-gray-300 mb-4" />
+                <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm min-h-[300px] flex flex-col items-center justify-center text-center">
+                    <TrendingUp className="w-12 h-12 text-gray-200 mb-4" />
                     <h3 className="text-gray-900 font-semibold text-lg">{t('resolution_efficiency_trend')}</h3>
-                    <p className="text-gray-500">{t('chart_unavailable')}</p>
+                    <p className="text-gray-400 text-sm mt-1">{t('chart_unavailable')}</p>
                 </div>
             </div>
         </div>
@@ -147,3 +134,4 @@ const ReportsTab: React.FC = () => {
 };
 
 export default ReportsTab;
+

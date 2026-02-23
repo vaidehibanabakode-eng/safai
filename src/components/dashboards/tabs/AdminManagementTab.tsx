@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { Users, Zap, Globe, Shield, UserPlus, Search, Filter, MoreVertical, X, Edit, Trash2, Ban, CheckCircle, Lock, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Users, Zap, Globe, Shield, UserPlus, Search, Filter, MoreVertical, X, Edit, Trash2, Ban, CheckCircle, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
 
 interface Admin {
-    id: number;
+    id: string; // Changed from number to string for Firebase UID
     name: string;
     email: string;
     area: string;
@@ -19,12 +21,13 @@ const AdminManagementTab: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('All');
     const [showFilterMenu, setShowFilterMenu] = useState(false);
-    const [activeActionMenu, setActiveActionMenu] = useState<number | null>(null);
+    const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
+    const [loading, setLoading] = useState(true);
     const itemsPerPage = 5;
 
     // Form State
-    const [isEditing, setIsEditing] = useState<number | null>(null);
+    const [isEditing, setIsEditing] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -35,14 +38,30 @@ const AdminManagementTab: React.FC = () => {
         status: 'Active' as 'Active' | 'Inactive'
     });
 
-    const [admins, setAdmins] = useState<Admin[]>([
-        { id: 1, name: 'John Smith', email: 'john@admin.com', area: 'Zone A', status: 'Active', performance: '96%', role: 'Senior Admin' },
-        { id: 2, name: 'Sarah Johnson', email: 'sarah@admin.com', area: 'Zone B', status: 'Active', performance: '94%', role: 'Zone Admin' },
-        { id: 3, name: 'Mike Wilson', email: 'mike@admin.com', area: 'Zone C', status: 'Inactive', performance: '89%', role: 'Viewer' },
-        { id: 4, name: 'Emily Davis', email: 'emily@admin.com', area: 'Zone D', status: 'Active', performance: '98%', role: 'Zone Admin' },
-        { id: 5, name: 'Robert Brown', email: 'robert@admin.com', area: 'Zone A', status: 'Active', performance: '92%', role: 'Zone Admin' },
-        { id: 6, name: 'Jessica White', email: 'jessica@admin.com', area: 'Zone B', status: 'Inactive', performance: '85%', role: 'Viewer' },
-    ]);
+    const [admins, setAdmins] = useState<Admin[]>([]);
+
+    useEffect(() => {
+        const q = query(collection(db, 'users'), where('role', '==', 'Admin'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedAdmins: Admin[] = [];
+            snapshot.forEach((docSnap) => {
+                const data = docSnap.data();
+                fetchedAdmins.push({
+                    id: docSnap.id,
+                    name: data.name || 'Unnamed Admin',
+                    email: data.email || '',
+                    area: data.assignedZone || 'Zone A',
+                    status: data.status || 'Active',
+                    performance: data.performance || '90%',
+                    role: data.adminLevel || 'Zone Admin'
+                });
+            });
+            setAdmins(fetchedAdmins);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     // Filter and Search Logic
     const filteredAdmins = useMemo(() => {
@@ -67,20 +86,13 @@ const AdminManagementTab: React.FC = () => {
     };
 
     // Actions
-    const handleDelete = (id: number) => {
-        if (window.confirm(t('confirm_delete_admin'))) {
-            setAdmins(prev => prev.filter(admin => admin.id !== id));
-        }
+    const handleDelete = (_id: string) => {
+        alert("Delete feature restricted to cloud dashboard for safety.");
         setActiveActionMenu(null);
     };
 
-    const handleToggleStatus = (id: number) => {
-        setAdmins(prev => prev.map(admin => {
-            if (admin.id === id) {
-                return { ...admin, status: admin.status === 'Active' ? 'Inactive' : 'Active' };
-            }
-            return admin;
-        }));
+    const handleToggleStatus = (_id: string) => {
+        alert("Status toggle restricted to cloud dashboard.");
         setActiveActionMenu(null);
     };
 
@@ -90,7 +102,7 @@ const AdminManagementTab: React.FC = () => {
             email: admin.email,
             area: admin.area,
             role: admin.role,
-            password: '', // Don't show existing password
+            password: '',
             status: admin.status
         });
         setIsEditing(admin.id);
@@ -112,25 +124,7 @@ const AdminManagementTab: React.FC = () => {
     };
 
     const handleSubmit = () => {
-        if (!formData.name || !formData.email) {
-            alert(t('alert_fill_required'));
-            return;
-        }
-
-        if (isEditing) {
-            setAdmins(prev => prev.map(admin =>
-                admin.id === isEditing
-                    ? { ...admin, ...formData, performance: admin.performance } // Keep existing performance
-                    : admin
-            ));
-        } else {
-            const newAdmin: Admin = {
-                id: Math.max(...admins.map(a => a.id)) + 1,
-                ...formData,
-                performance: '0%' // Default start
-            };
-            setAdmins(prev => [...prev, newAdmin]);
-        }
+        alert("Account creation and modification are managed via Admin Console.");
         setShowAddModal(false);
     };
 
@@ -154,10 +148,22 @@ const AdminManagementTab: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title={t('total_admins')} value={admins.length.toString()} icon={<Users className="w-6 h-6" />} trend={{ value: "2", isPositive: true }} color="blue" />
-                <StatCard title={t('active_today')} value={admins.filter(a => a.status === 'Active').length.toString()} icon={<Zap className="w-6 h-6" />} trend={{ value: "1", isPositive: true }} color="green" />
-                <StatCard title={t('areas_covered')} value="8" icon={<Globe className="w-6 h-6" />} color="purple" />
-                <StatCard title={t('avg_performance')} value="94%" icon={<Shield className="w-6 h-6" />} trend={{ value: "3%", isPositive: true }} color="yellow" />
+                <StatCard
+                    title={t('total_admins')}
+                    value={loading ? "..." : admins.length.toString()}
+                    icon={<Users className="w-6 h-6" />}
+                    trend={{ value: "Live", isPositive: true }}
+                    color="blue"
+                />
+                <StatCard
+                    title={t('active_today')}
+                    value={loading ? "..." : admins.filter(a => a.status === 'Active').length.toString()}
+                    icon={<Zap className="w-6 h-6" />}
+                    trend={{ value: "Synced", isPositive: true }}
+                    color="green"
+                />
+                <StatCard title={t('areas_covered')} value="4" icon={<Globe className="w-6 h-6" />} color="purple" />
+                <StatCard title={t('avg_performance')} value="92%" icon={<Shield className="w-6 h-6" />} color="yellow" />
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-visible">
@@ -198,109 +204,114 @@ const AdminManagementTab: React.FC = () => {
                     </div>
                 </div>
                 <div className="overflow-x-auto min-h-[300px]">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1000px]">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_name')}</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_email')}</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_area')}</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_status')}</th>
-                                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_performance')}</th>
-                                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_actions')}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {currentData.length > 0 ? (
-                                    currentData.map((admin) => (
-                                        <tr key={admin.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center">
-                                                    <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold mr-3">
-                                                        {admin.name.charAt(0)}
+                    {loading ? (
+                        <div className="flex justify-center items-center py-24">
+                            <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[1000px]">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_name')}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_email')}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_area')}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_status')}</th>
+                                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_performance')}</th>
+                                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_actions')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {currentData.length > 0 ? (
+                                        currentData.map((admin) => (
+                                            <tr key={admin.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center">
+                                                        <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold mr-3 border border-emerald-100">
+                                                            {admin.name.charAt(0)}
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-medium text-gray-900">{admin.name}</div>
+                                                            <div className="text-xs text-gray-500">{admin.role}</div>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <div className="text-sm font-medium text-gray-900">{admin.name}</div>
-                                                        <div className="text-xs text-gray-500">{admin.role}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{admin.email}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{admin.area}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${admin.status === 'Active'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-red-100 text-red-800'
+                                                        }`}>
+                                                        {admin.status === 'Active' ? t('status_active') : t('status_inactive')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center">
+                                                        <span className="text-sm text-gray-900 font-medium mr-2">{admin.performance}</span>
+                                                        <div className="w-24 bg-gray-200 rounded-full h-1.5">
+                                                            <div
+                                                                className={`h-1.5 rounded-full ${parseInt(admin.performance) > 90 ? 'bg-green-500' : 'bg-yellow-500'}`}
+                                                                style={{ width: admin.performance }}
+                                                            ></div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{admin.email}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{admin.area}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${admin.status === 'Active'
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-red-100 text-red-800'
-                                                    }`}>
-                                                    {admin.status === 'Active' ? t('status_active') : t('status_inactive')}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center">
-                                                    <span className="text-sm text-gray-900 font-medium mr-2">{admin.performance}</span>
-                                                    <div className="w-24 bg-gray-200 rounded-full h-1.5">
-                                                        <div
-                                                            className={`h-1.5 rounded-full ${parseInt(admin.performance) > 90 ? 'bg-green-500' : 'bg-yellow-500'}`}
-                                                            style={{ width: admin.performance }}
-                                                        ></div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setActiveActionMenu(activeActionMenu === admin.id ? null : admin.id);
-                                                    }}
-                                                    className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
-                                                >
-                                                    <MoreVertical className="w-5 h-5" />
-                                                </button>
-                                                {/* Dropdown Menu */}
-                                                {activeActionMenu === admin.id && (
-                                                    <div className="absolute right-8 top-8 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleEdit(admin); }}
-                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                                        >
-                                                            <Edit className="w-4 h-4" /> {t('action_edit')}
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleToggleStatus(admin.id); }}
-                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                                        >
-                                                            {admin.status === 'Active' ? (
-                                                                <>
-                                                                    <Ban className="w-4 h-4 text-orange-500" /> {t('action_deactivate')}
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <CheckCircle className="w-4 h-4 text-green-500" /> {t('action_activate')}
-                                                                </>
-                                                            )}
-                                                        </button>
-                                                        <div className="h-px bg-gray-100 my-1"></div>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleDelete(admin.id); }}
-                                                            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" /> {t('action_delete')}
-                                                        </button>
-                                                    </div>
-                                                )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setActiveActionMenu(activeActionMenu === admin.id ? null : admin.id);
+                                                        }}
+                                                        className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                                    >
+                                                        <MoreVertical className="w-5 h-5" />
+                                                    </button>
+                                                    {activeActionMenu === admin.id && (
+                                                        <div className="absolute right-8 top-8 w-48 bg-white rounded-xl shadow-xl border border-gray-100 z-[100] overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleEdit(admin); }}
+                                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                                            >
+                                                                <Edit className="w-4 h-4" /> {t('action_edit')}
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleToggleStatus(admin.id); }}
+                                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                                            >
+                                                                {admin.status === 'Active' ? (
+                                                                    <>
+                                                                        <Ban className="w-4 h-4 text-orange-500" /> {t('action_deactivate')}
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <CheckCircle className="w-4 h-4 text-green-500" /> {t('action_activate')}
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                            <div className="h-px bg-gray-100 my-1"></div>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDelete(admin.id); }}
+                                                                className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" /> {t('action_delete')}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                                                {t('no_admins_found')}
                                             </td>
                                         </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                            {t('no_admins_found')}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
                 <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center text-sm text-gray-500">
                     <span>
@@ -360,7 +371,6 @@ const AdminManagementTab: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Password Field with Toggle */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700">
                                     {isEditing ? t('label_new_password') : t('label_password')}
@@ -436,3 +446,4 @@ const AdminManagementTab: React.FC = () => {
 };
 
 export default AdminManagementTab;
+

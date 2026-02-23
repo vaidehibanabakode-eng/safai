@@ -31,6 +31,14 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             return;
         }
 
+        const roleMap: Record<string, string> = {
+            worker: 'Worker',
+            citizen: 'Citizen',
+            admin: 'Admin',
+            superadmin: 'Superadmin'
+        };
+        const firestoreRole = roleMap[role] || 'Citizen';
+
         try {
             // 1. Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -39,16 +47,8 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             // 2. Update display name in Auth profile
             await updateProfile(user, { displayName: name });
 
-            // 3. Map lowercase role to Capitalized role for Firestore UserProfile
-            const roleMap: Record<string, string> = {
-                worker: 'Worker',
-                citizen: 'Citizen',
-                admin: 'Admin',
-                superadmin: 'Superadmin'
-            };
-            const firestoreRole = roleMap[role] || 'Citizen';
-
-            // 4. Save extended user profile to Firestore
+            // 3. Save extended user profile to Firestore BEFORE proceeding
+            // This ensures the profile exists when auth state changes
             await setDoc(doc(db, 'users', user.uid), {
                 uid: user.uid,
                 email: user.email,
@@ -67,19 +67,28 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 }
             });
 
+            // 4. Notify success only after Firestore write completes
             onSignupSuccess(email);
         } catch (err: any) {
             console.error('🔥 Detailed Signup Error:', err);
-            console.error('Error Code:', err.code);
-            console.error('Error Message:', err.message);
+
+            // Critical: If auth succeeded but Firestore failed, we must sign out 
+            // to prevent the app from landing in a half-logged-in state.
+            try {
+                await auth.signOut();
+            } catch (signOutErr) {
+                console.error('Sign out error after partial failure:', signOutErr);
+            }
 
             // Translate common Firebase errors
             if (err.code === 'auth/email-already-in-use') {
                 setError('User with this email already exists');
             } else if (err.code === 'auth/weak-password') {
                 setError('Password is too weak. Please use at least 6 characters.');
+            } else if (err.code === 'permission-denied') {
+                setError('Database access denied. Your database is blocking the "' + firestoreRole + '" role. Please run the deployment command (see walkthrough.md) or update rules manually in Firebase Console.');
             } else {
-                setError('Failed to create account. Please try again.');
+                setError('Failed to create account profile. Error: ' + (err.message || 'Unknown error'));
             }
         } finally {
             setIsLoading(false);
@@ -111,7 +120,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             const docSnap = await getDoc(docRef);
 
             if (!docSnap.exists()) {
-                // First time Google Sign in - assign selected role
+                // First time Google Sign in - assign SELECTED role (not always Citizen)
                 await setDoc(docRef, {
                     uid: user.uid,
                     email: user.email,
@@ -201,27 +210,6 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                         </div>
                     )}
 
-                    <div className="space-y-6 mb-6">
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('select_role')}</label>
-                            <div className="relative">
-                                <select
-                                    value={role}
-                                    onChange={(e) => setRole(e.target.value as UserRole)}
-                                    className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none appearance-none text-gray-900"
-                                >
-                                    <option value="">{t('choose_role')}</option>
-                                    <option value="worker">{t('role_worker')}</option>
-                                    <option value="citizen">{t('role_citizen')}</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="superadmin">Super Admin</option>
-                                </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
-                                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path></svg>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <div className="flex flex-col gap-4">
                         <button
@@ -260,6 +248,27 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-5">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('select_role')}</label>
+                                <div className="relative">
+                                    <select
+                                        value={role}
+                                        onChange={(e) => setRole(e.target.value as UserRole)}
+                                        className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none appearance-none text-gray-900"
+                                        required
+                                    >
+                                        <option value="">{t('choose_role')}</option>
+                                        <option value="worker">{t('role_worker')}</option>
+                                        <option value="citizen">{t('role_citizen')}</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="superadmin">Super Admin</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                                        <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path></svg>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('full_name')}</label>
                                 <input

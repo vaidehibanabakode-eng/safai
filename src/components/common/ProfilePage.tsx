@@ -65,6 +65,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
         }
     };
 
+    const handlePromoteToSuperadmin = async () => {
+        if (!window.confirm('Are you sure you want to elevate this account to Super Administrator? This action will grant full system access.')) {
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const userRef = doc(db, 'users', user.id);
+            await updateDoc(userRef, {
+                role: 'Superadmin'
+            });
+            alert('Account elevated to Superadmin successfully! Please refresh the page if the dashboard does not update automatically.');
+            window.location.reload();
+        } catch (error) {
+            console.error('Error promoting to superadmin:', error);
+            alert('Failed to elevate account. You might not have sufficient permissions in Firestore.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const field = (
         label: string,
         key: keyof typeof form,
@@ -276,6 +297,28 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
                     <Lock className="w-5 h-5 text-red-500" />
                     <h3 className="text-lg font-semibold text-gray-900">{t('security')}</h3>
                 </div>
+
+                {/* Secret Superadmin Promotion for "SUPERADMIN" user */}
+                {user.name === 'SUPERADMIN' && user.role !== 'superadmin' && (
+                    <div className="mb-6 p-4 bg-purple-50 border border-purple-100 rounded-xl animate-in fade-in zoom-in duration-500">
+                        <h4 className="text-purple-900 font-bold mb-1 flex items-center gap-2">
+                            <Shield className="w-4 h-4" />
+                            Administrative Action
+                        </h4>
+                        <p className="text-purple-700 text-sm mb-4">
+                            Your name is set to SUPERADMIN. You can elevate this account to full Super Administrator status.
+                        </p>
+                        <button
+                            onClick={handlePromoteToSuperadmin}
+                            disabled={isSaving}
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold transition-colors shadow-lg shadow-purple-200 flex items-center justify-center gap-2"
+                        >
+                            <Shield className="w-5 h-5" />
+                            {isSaving ? 'Processing...' : 'Elevate to Superadmin'}
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-3">
                     <button className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors">
                         <Lock className="w-4 h-4" />

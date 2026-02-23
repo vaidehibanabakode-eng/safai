@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 // Extended user profile stored in Firestore
@@ -45,69 +45,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        let unsubscribeProfile: (() => void) | null = null;
+
+        const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
+
+            // Clean up previous profile listener if any
+            if (unsubscribeProfile) {
+                unsubscribeProfile();
+                unsubscribeProfile = null;
+            }
+
             if (user) {
-                try {
-                    // Fetch ID Token to get Custom Claims securely
-                    const idTokenResult = await user.getIdTokenResult();
-                    const claimRole = idTokenResult.claims.role as string | undefined;
+                // Set initial loading state for profile
+                setLoading(true);
 
-                    // Fetch extended user profile from Firestore
-                    const docRef = doc(db, 'users', user.uid);
-                    const docSnap = await getDoc(docRef);
-                    let firestoreData: any = null;
+                // Start listening to the user profile document
+                const docRef = doc(db, 'users', user.uid);
+                unsubscribeProfile = onSnapshot(docRef,
+                    (docSnap: any) => {
+                        let firestoreData: any = null;
+                        if (docSnap.exists()) {
+                            firestoreData = docSnap.data();
+                        }
 
-                    if (docSnap.exists()) {
-                        firestoreData = docSnap.data();
+                        // Resolve role from Firestore data — Firestore is the source of truth
+                        // Validate that the role is one of the allowed values
+                        let resolvedRole: UserProfile['role'] = 'Citizen';
+                        if (firestoreData && firestoreData.role) {
+                            const validRoles: UserProfile['role'][] = ['Citizen', 'Worker', 'Admin', 'Superadmin'];
+                            if (validRoles.includes(firestoreData.role)) {
+                                resolvedRole = firestoreData.role;
+                            }
+                        }
+
+                        setUserProfile({
+                            uid: user.uid,
+                            email: user.email || '',
+                            name: user.displayName || firestoreData?.name || 'User',
+                            role: resolvedRole,
+                            area: firestoreData?.area,
+                            rewardPoints: firestoreData?.rewardPoints,
+                            createdAt: firestoreData?.createdAt,
+                            phone: firestoreData?.phone,
+                            address: firestoreData?.address,
+                            citizenID: firestoreData?.citizenID,
+                            assignedZone: firestoreData?.assignedZone,
+                            memberSince: firestoreData?.memberSince,
+                            preferences: firestoreData?.preferences
+                        });
+                        setLoading(false);
+                    },
+                    (error: any) => {
+                        console.error("Error listening to user profile:", error);
+                        // Fallback
+                        setUserProfile({
+                            uid: user.uid,
+                            email: user.email || '',
+                            name: user.displayName || 'User',
+                            role: 'Citizen',
+                        });
+                        setLoading(false);
                     }
-
-                    // Secure Role Resolution:
-                    // For now, trusting Firestore entirely so anyone can sign up as any role directly from the UI.
-                    let resolvedRole: UserProfile['role'] = 'Citizen';
-
-                    if (claimRole === 'SUPER_ADMIN') resolvedRole = 'Superadmin';
-                    else if (claimRole === 'ADMIN') resolvedRole = 'Admin';
-                    else if (claimRole === 'WORKER') resolvedRole = 'Worker';
-                    else if (claimRole === 'CITIZEN') resolvedRole = 'Citizen';
-                    else if (firestoreData && firestoreData.role) {
-                        resolvedRole = firestoreData.role;
-                    }
-
-                    setUserProfile({
-                        uid: user.uid,
-                        email: user.email || '',
-                        name: user.displayName || firestoreData?.name || 'User',
-                        role: resolvedRole,
-                        area: firestoreData?.area,
-                        rewardPoints: firestoreData?.rewardPoints,
-                        createdAt: firestoreData?.createdAt,
-                        phone: firestoreData?.phone,
-                        address: firestoreData?.address,
-                        citizenID: firestoreData?.citizenID,
-                        assignedZone: firestoreData?.assignedZone,
-                        memberSince: firestoreData?.memberSince,
-                        preferences: firestoreData?.preferences
-                    });
-                } catch (error) {
-                    console.error("Error fetching user profile:", error);
-                    // Critical Fallback: if Firestore fails (e.g., rules not synced, doc missing), still let them in as Citizen
-                    setUserProfile({
-                        uid: user.uid,
-                        email: user.email || '',
-                        name: user.displayName || 'User',
-                        role: 'Citizen',
-                    });
-                } finally {
-                    setLoading(false);
-                }
+                );
             } else {
                 setUserProfile(null);
                 setLoading(false);
             }
         });
 
-        return unsubscribe;
+        return () => {
+            unsubscribeAuth();
+            if (unsubscribeProfile) unsubscribeProfile();
+        };
     }, []);
 
     const value = {
@@ -118,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };
