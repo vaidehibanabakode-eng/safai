@@ -8,12 +8,18 @@ import {
     Mail,
     Shield,
     ChevronRight,
+    Loader2,
+    ExternalLink,
 } from 'lucide-react';
 import { User } from '../../../App';
 import LanguageSwitcher from '../../common/LanguageSwitcher';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useToast } from '../../../contexts/ToastContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../../lib/firebase';
+import packageInfo from '../../../../package.json';
 
 // import { useTheme } from '../../../contexts/ThemeContext'; // Removed
 
@@ -22,9 +28,11 @@ interface SettingsTabProps {
 }
 
 const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
+    const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
     const [emailNotif, setEmailNotif] = useState(user?.preferences?.notifications ?? true);
     const [pushNotif, setPushNotif] = useState(user?.preferences?.notifications ?? true);
     const [smsNotif, setSmsNotif] = useState(false);
+    const [sendingReset, setSendingReset] = useState(false);
 
     const handlePreferencesUpdate = async (field: string, value: boolean) => {
         if (!user) return;
@@ -55,6 +63,32 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
         setSmsNotif(newValue);
         handlePreferencesUpdate('smsNotif', newValue);
     };
+    const handleChangePassword = async () => {
+        const email = user?.email || auth.currentUser?.email;
+        if (!email) { toastError('No email address found for this account.'); return; }
+        setSendingReset(true);
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toastSuccess(`Password reset email sent to ${email}. Check your inbox.`);
+        } catch (err: any) {
+            toastError(err.message || 'Failed to send reset email. Please try again.');
+        } finally {
+            setSendingReset(false);
+        }
+    };
+
+    const handleTwoFactor = () => {
+        toastInfo('Two-factor authentication enrollment is coming soon. Stay tuned for updates!');
+    };
+
+    const handlePrivacyPolicy = () => {
+        window.open('https://safaiconnect.in/privacy', '_blank', 'noopener,noreferrer');
+    };
+
+    const handleContactSupport = () => {
+        window.location.href = 'mailto:support@safaiconnect.in?subject=SafaiConnect Support Request';
+    };
+
     // const { theme, toggleTheme } = useTheme(); // Removed for forced light mode
     const { t } = useLanguage();
 
@@ -160,26 +194,40 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
                         </h3>
                     </div>
                     <div className="p-6 space-y-2">
-                        <button className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group">
+                        <button
+                            onClick={handleChangePassword}
+                            disabled={sendingReset}
+                            className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group disabled:opacity-60"
+                        >
                             <div className="flex items-center gap-3">
-                                <Lock className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
-                                <span className="font-medium text-gray-700 group-hover:text-gray-900">{t('change_password')}</span>
+                                {sendingReset
+                                    ? <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+                                    : <Lock className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />}
+                                <span className="font-medium text-gray-700 group-hover:text-gray-900">
+                                    {sendingReset ? 'Sending reset email…' : t('change_password')}
+                                </span>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                            {!sendingReset && <ChevronRight className="w-4 h-4 text-gray-400" />}
                         </button>
-                        <button className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group">
+                        <button
+                            onClick={handleTwoFactor}
+                            className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group"
+                        >
                             <div className="flex items-center gap-3">
                                 <Shield className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
                                 <span className="font-medium text-gray-700 group-hover:text-gray-900">{t('two_factor_auth')}</span>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Soon</span>
                         </button>
-                        <button className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group">
+                        <button
+                            onClick={handlePrivacyPolicy}
+                            className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group"
+                        >
                             <div className="flex items-center gap-3">
                                 <HelpCircle className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
                                 <span className="font-medium text-gray-700 group-hover:text-gray-900">{t('privacy_policy')}</span>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                            <ExternalLink className="w-4 h-4 text-gray-400" />
                         </button>
                     </div>
                 </div>
@@ -196,12 +244,15 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
                         <div className="bg-emerald-50 rounded-xl p-4">
                             <p className="text-sm text-emerald-800 font-medium">{t('need_help')}</p>
                             <p className="text-xs text-emerald-600 mt-1">{t('support_desc')}</p>
-                            <button className="mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800">
-                                {t('contact_support')} →
+                            <button
+                                onClick={handleContactSupport}
+                                className="mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
+                            >
+                                {t('contact_support')} <ExternalLink className="w-3 h-3" />
                             </button>
                         </div>
                         <div className="text-center pt-2">
-                            <p className="text-xs text-gray-400">SafaiConnect v2.4.0</p>
+                            <p className="text-xs text-gray-400">SafaiConnect v{packageInfo.version}</p>
                         </div>
                     </div>
                 </div>

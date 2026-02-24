@@ -5,6 +5,13 @@ import { useLanguage } from '../../contexts/LanguageContext';
 const LOCALES: { code: string; label: string; nativeLabel: string }[] = [
     { code: 'en', label: 'English', nativeLabel: 'English' },
     { code: 'hi', label: 'Hindi', nativeLabel: 'हिंदी' },
+    { code: 'mr', label: 'Marathi', nativeLabel: 'मराठी' },
+    { code: 'gu', label: 'Gujarati', nativeLabel: 'ગુજરાતી' },
+    { code: 'bn', label: 'Bengali', nativeLabel: 'বাংলা' },
+    { code: 'ta', label: 'Tamil', nativeLabel: 'தமிழ்' },
+    { code: 'te', label: 'Telugu', nativeLabel: 'తెలుగు' },
+    { code: 'kn', label: 'Kannada', nativeLabel: 'ಕನ್ನಡ' },
+    { code: 'ur', label: 'Urdu', nativeLabel: 'اردو' },
 ];
 
 const LanguageSwitcher: React.FC = () => {
@@ -36,7 +43,7 @@ const LanguageSwitcher: React.FC = () => {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-72 overflow-y-auto">
                     {LOCALES.map((locale) => (
                         <button
                             key={locale.code}
@@ -51,7 +58,7 @@ const LanguageSwitcher: React.FC = () => {
                                 }`}
                         >
                             <span>{locale.label}</span>
-                            <span className="text-xs text-gray-500">{locale.nativeLabel}</span>
+                            <span className="text-xs text-gray-500 font-medium">{locale.nativeLabel}</span>
                         </button>
                     ))}
                 </div>

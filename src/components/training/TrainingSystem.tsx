@@ -18,6 +18,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { User } from '../../App';
 import LanguageSwitcher from '../common/LanguageSwitcher';
+import { useToast } from '../../contexts/ToastContext';
 import { TRAINING_MODULES, TrainingModule, Exercise } from '../../data/trainingModules';
 
 interface TrainingSystemProps {
@@ -48,6 +49,7 @@ interface ExerciseState {
 }
 
 const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
+  const { warning: toastWarning } = useToast();
   const [userProgress, setUserProgress] = useState<UserProgress>({
     completedModules: [],
     totalPoints: 0,
@@ -72,6 +74,9 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
   });
 
   const [showExercise, setShowExercise] = useState(false);
+  // UI state for interactive exercise types
+  const [pendingDragItem, setPendingDragItem] = useState<string | null>(null);
+  const [selectedMatchLeft, setSelectedMatchLeft] = useState<number | null>(null);
 
   const modules = TRAINING_MODULES[user.role] || [];
 
@@ -125,7 +130,7 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
         prereq => !userProgress.completedModules.includes(prereq)
       );
       if (unmetPrereqs.length > 0) {
-        alert('Please complete prerequisite modules first');
+        toastWarning('Please complete prerequisite modules first');
         return;
       }
     }
@@ -160,8 +165,31 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
       case 'true-false':
         isCorrect = selectedAnswer === currentExercise.correctAnswer;
         break;
+      case 'fill-blank':
+        isCorrect = Array.isArray(selectedAnswer) &&
+          (currentExercise.correctAnswers as string[][]).every(
+            (opts: string[], i: number) =>
+              opts.some((opt: string) =>
+                opt.toLowerCase() === (selectedAnswer[i] || '').toLowerCase().trim()
+              )
+          );
+        break;
+      case 'drag-drop': {
+        const mapping = exerciseState.matchingState || {};
+        const correct = currentExercise.correctMapping as Record<string, string>;
+        isCorrect = correct != null &&
+          Object.keys(correct).every(item => mapping[item] === correct[item]);
+        break;
+      }
+      case 'matching': {
+        const matches = exerciseState.matchingState as number[];
+        const correctMatches = currentExercise.correctMatches as number[];
+        isCorrect = Array.isArray(matches) && Array.isArray(correctMatches) &&
+          correctMatches.every((m: number, i: number) => matches[i] === m);
+        break;
+      }
       default:
-        isCorrect = true; // Simplified for other types
+        isCorrect = true;
     }
 
     processAnswer(isCorrect);
@@ -190,7 +218,10 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
     } else {
       newState.currentExercise = exerciseState.currentModule?.exercises[newState.exerciseIndex] || null;
       newState.selectedAnswer = null;
+      newState.matchingState = null;
       newState.videoWatched = false;
+      setPendingDragItem(null);
+      setSelectedMatchLeft(null);
       setExerciseState(newState);
     }
   };
@@ -341,7 +372,20 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
     const exercise = exerciseState.currentExercise;
     const progress = ((exerciseState.exerciseIndex + 1) / exerciseState.currentModule.exercises.length) * 100;
     const isVideo = exercise.type === 'video-lecture';
-    const canSubmit = isVideo ? exerciseState.videoWatched : exerciseState.selectedAnswer !== null;
+    const canSubmit = isVideo
+      ? exerciseState.videoWatched
+      : exercise.type === 'fill-blank'
+        ? Array.isArray(exerciseState.selectedAnswer) &&
+          exerciseState.selectedAnswer.every((v: string) => v.trim() !== '')
+        : exercise.type === 'drag-drop'
+          ? exerciseState.matchingState != null &&
+            (exercise.items as string[] | undefined)?.every(
+              (item: string) => exerciseState.matchingState[item] !== undefined
+            )
+          : exercise.type === 'matching'
+            ? Array.isArray(exerciseState.matchingState) &&
+              exerciseState.matchingState.every((v: number) => v !== -1)
+            : exerciseState.selectedAnswer !== null;
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -515,6 +559,247 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
             </div>
           </div>
         );
+
+      case 'fill-blank': {
+        // selectedAnswer is a string[] parallel to the blanks
+        const blanks = (exercise.sentence || '').split('___');
+        const answers: string[] = Array.isArray(exerciseState.selectedAnswer)
+          ? exerciseState.selectedAnswer
+          : Array(blanks.length - 1).fill('');
+
+        const updateBlank = (idx: number, val: string) => {
+          const next = [...answers];
+          next[idx] = val;
+          setExerciseState(prev => ({ ...prev, selectedAnswer: next }));
+        };
+
+        return (
+          <div className="space-y-8">
+            <div className="text-center">
+              <div className="text-4xl mb-3">✏️</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">{exercise.question || 'Fill in the blanks'}</h3>
+              <p className="text-gray-500 text-sm">Type the missing words to complete each sentence</p>
+            </div>
+
+            <div className="max-w-2xl mx-auto bg-gray-50 rounded-2xl p-6 border border-gray-200">
+              <div className="text-lg text-gray-800 leading-10 flex flex-wrap items-center gap-1">
+                {blanks.map((part, i) => (
+                  <React.Fragment key={i}>
+                    <span>{part}</span>
+                    {i < blanks.length - 1 && (
+                      <input
+                        value={answers[i] || ''}
+                        onChange={e => updateBlank(i, e.target.value)}
+                        placeholder={exercise.hints?.[i] ? `hint: ${exercise.hints[i]}` : '…'}
+                        className="inline-block border-b-2 border-green-500 bg-white rounded-lg px-3 py-1 text-center text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-green-400 min-w-[100px] text-base"
+                      />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            {exercise.hints && exercise.hints.length > 0 && (
+              <div className="max-w-2xl mx-auto">
+                <p className="text-xs text-gray-400 text-center">
+                  💡 Hints: {(exercise.hints as string[]).join(' · ')}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      case 'drag-drop': {
+        // matchingState is Record<item, category>
+        const mapping: Record<string, string> = exerciseState.matchingState || {};
+        const items: string[] = exercise.items || [];
+        const categories: string[] = exercise.categories || [];
+
+        const assignItem = (item: string, category: string) => {
+          const next = { ...mapping, [item]: category };
+          setExerciseState(prev => ({ ...prev, matchingState: next }));
+          setPendingDragItem(null);
+        };
+
+        const unassign = (item: string) => {
+          const next = { ...mapping };
+          delete next[item];
+          setExerciseState(prev => ({ ...prev, matchingState: next }));
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="text-4xl mb-3">🗂️</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">{exercise.question}</h3>
+              <p className="text-gray-500 text-sm">Click an item, then click its category to sort it</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              {/* Items to sort */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Items</p>
+                <div className="space-y-2">
+                  {items.map(item => {
+                    const assigned = mapping[item];
+                    return (
+                      <div key={item} className="flex items-center gap-2">
+                        <button
+                          onClick={() => assigned ? unassign(item) : setPendingDragItem(pendingDragItem === item ? null : item)}
+                          className={`flex-1 px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-all ${
+                            pendingDragItem === item
+                              ? 'border-green-500 bg-green-50 text-green-800'
+                              : assigned
+                                ? 'border-gray-200 bg-white text-gray-400 line-through'
+                                : 'border-gray-200 bg-white text-gray-800 hover:border-green-400'
+                          }`}
+                        >
+                          {item}
+                        </button>
+                        {assigned && (
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-lg font-medium shrink-0">
+                            → {assigned}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Categories</p>
+                <div className="space-y-2">
+                  {categories.map(cat => {
+                    const assigned = Object.entries(mapping).filter(([, v]) => v === cat).map(([k]) => k);
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => pendingDragItem ? assignItem(pendingDragItem, cat) : undefined}
+                        className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium text-left transition-all ${
+                          pendingDragItem
+                            ? 'border-dashed border-green-400 bg-green-50 hover:bg-green-100 cursor-pointer text-green-800'
+                            : 'border-gray-200 bg-gray-50 text-gray-700 cursor-default'
+                        }`}
+                      >
+                        <div className="font-semibold mb-1">{cat}</div>
+                        {assigned.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {assigned.map(a => (
+                              <span key={a} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{a}</span>
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      case 'matching': {
+        // matchingState is number[] — selectedRightIdx for each leftItem (-1 = none)
+        const leftItems: string[] = exercise.leftItems || [];
+        const rightItems: string[] = exercise.rightItems || [];
+        const matches: number[] = Array.isArray(exerciseState.matchingState)
+          ? exerciseState.matchingState
+          : Array(leftItems.length).fill(-1);
+        const usedRights = new Set(matches.filter(m => m !== -1));
+
+        const handleLeftClick = (i: number) => setSelectedMatchLeft(selectedMatchLeft === i ? null : i);
+
+        const handleRightClick = (j: number) => {
+          if (selectedMatchLeft === null) return;
+          const next = [...matches];
+          // Un-match if this right was already used by another left
+          const prevLeft = next.findIndex(m => m === j);
+          if (prevLeft !== -1) next[prevLeft] = -1;
+          // Assign current left → right
+          next[selectedMatchLeft] = j;
+          setExerciseState(prev => ({ ...prev, matchingState: next }));
+          setSelectedMatchLeft(null);
+        };
+
+        const unmatch = (i: number) => {
+          const next = [...matches];
+          next[i] = -1;
+          setExerciseState(prev => ({ ...prev, matchingState: next }));
+        };
+
+        const PAIR_COLORS = [
+          'bg-purple-100 text-purple-700 border-purple-300',
+          'bg-blue-100 text-blue-700 border-blue-300',
+          'bg-amber-100 text-amber-700 border-amber-300',
+          'bg-rose-100 text-rose-700 border-rose-300',
+          'bg-teal-100 text-teal-700 border-teal-300',
+        ];
+
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="text-4xl mb-3">🔗</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">{exercise.question}</h3>
+              <p className="text-gray-500 text-sm">Click a left item then click its match on the right</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 max-w-2xl mx-auto">
+              {/* Left column */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Column A</p>
+                {leftItems.map((item, i) => {
+                  const matchedRight = matches[i];
+                  const color = matchedRight !== -1 ? PAIR_COLORS[i % PAIR_COLORS.length] : '';
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <button
+                        onClick={() => matchedRight !== -1 ? unmatch(i) : handleLeftClick(i)}
+                        className={`flex-1 px-4 py-3 rounded-xl border-2 text-sm font-medium text-center transition-all ${
+                          selectedMatchLeft === i
+                            ? 'border-green-500 bg-green-50 text-green-800'
+                            : matchedRight !== -1
+                              ? `border ${color}`
+                              : 'border-gray-200 bg-white text-gray-800 hover:border-green-400'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Right column */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Column B</p>
+                {rightItems.map((item, j) => {
+                  const matchedByLeft = matches.findIndex(m => m === j);
+                  const color = matchedByLeft !== -1 ? PAIR_COLORS[matchedByLeft % PAIR_COLORS.length] : '';
+                  return (
+                    <button
+                      key={j}
+                      onClick={() => handleRightClick(j)}
+                      className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium text-center transition-all ${
+                        matchedByLeft !== -1
+                          ? `border ${color}`
+                          : selectedMatchLeft !== null && !usedRights.has(j)
+                            ? 'border-dashed border-green-400 bg-green-50 text-green-800 hover:bg-green-100'
+                            : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      }
 
       default:
         return (

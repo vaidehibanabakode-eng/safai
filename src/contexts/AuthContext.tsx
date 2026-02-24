@@ -8,7 +8,7 @@ export interface UserProfile {
     uid: string;
     email: string;
     name: string;
-    role: 'Citizen' | 'Worker' | 'Admin' | 'Superadmin';
+    role: string;
     area?: string;
     rewardPoints?: number;
     createdAt?: any;
@@ -71,10 +71,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                         // Resolve role from Firestore data — Firestore is the source of truth
                         // Validate that the role is one of the allowed values
-                        let resolvedRole: UserProfile['role'] = 'Citizen';
+                        let resolvedRole: string = 'Citizen';
                         if (firestoreData && firestoreData.role) {
-                            const validRoles: UserProfile['role'][] = ['Citizen', 'Worker', 'Admin', 'Superadmin'];
-                            if (validRoles.includes(firestoreData.role)) {
+                            const validRoles = ['citizen', 'worker', 'admin', 'superadmin', 'green-champion'];
+                            const normalizedRole = String(firestoreData.role).toLowerCase();
+                            if (validRoles.includes(normalizedRole)) {
                                 resolvedRole = firestoreData.role;
                             }
                         }

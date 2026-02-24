@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useToast } from '../../contexts/ToastContext';
 import { addDoc, collection, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../lib/firebase';
@@ -21,6 +22,10 @@ import {
   AlertTriangle,
   History,
   Settings,
+  Truck,
+  PhoneCall,
+  CalendarPlus,
+  Trophy,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -85,11 +90,15 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) => {
+  const { error: toastError, warning: toastWarning, info: toastInfo, success: toastSuccess } = useToast();
   const [activeTab, setActiveTab] = useState('home'); // Changed default to 'home' to match new key
   const [isListening, setIsListening] = useState(false);
   const [description, setDescription] = useState('');
   const [issueType, setIssueType] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ── Draft key is per-user so different accounts don't share drafts ──────
+  const DRAFT_KEY = `draft_complaint_${user?.id}`;
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [submitError, setSubmitError] = useState('');
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
@@ -158,6 +167,31 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     return () => unsubscribe();
   }, [user]);
 
+  // ── Restore draft when user lands on the report tab ─────────────────────
+  React.useEffect(() => {
+    if (activeTab !== 'report') return;
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      const draft = JSON.parse(saved) as { issueType?: string; description?: string; location?: string };
+      if (draft.issueType || draft.description || draft.location) {
+        if (draft.issueType) setIssueType(draft.issueType);
+        if (draft.description) setDescription(draft.description);
+        toastInfo('Draft restored — your previous report was recovered.');
+      }
+    } catch { /* ignore corrupt draft */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handleSaveDraft = () => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ issueType, description }));
+      toastSuccess('Draft saved! Your progress is stored locally.');
+    } catch {
+      toastError('Could not save draft. Storage may be full.');
+    }
+  };
+
   const handleOpenRating = (complaintId: string) => {
     setComplaintToRate(complaintId);
     setRating(0);
@@ -186,7 +220,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       setComplaintToRate(null);
     } catch (e) {
       console.error("Error submitting rating", e);
-      alert("Failed to submit rating");
+      toastError("Failed to submit rating");
     } finally {
       setIsSubmittingRating(false);
     }
@@ -295,7 +329,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
         longitude = position.coords.longitude;
       } else {
         if (!navigator.geolocation) {
-          alert('Geolocation is not supported by your browser.');
+          toastWarning('Geolocation is not supported by your browser.');
           setLocationLoading(false);
           return;
         }
@@ -317,7 +351,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       }
     } catch (e) {
       console.warn('Unable to fetch location', e);
-      alert('Unable to fetch location. Please allow location access.');
+      toastWarning('Unable to fetch location. Please allow location access.');
     } finally {
       setLocationLoading(false);
     }
@@ -329,7 +363,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognitionAPI) {
-      alert('Speech recognition is not supported in this browser. Please use Chrome.');
+      toastInfo('Speech recognition is not supported in this browser. Please use Chrome.');
       return;
     }
 
@@ -424,7 +458,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       await addDoc(collection(db, 'complaints'), complaintData);
 
       setSubmitSuccess('Your complaint has been successfully submitted!');
-      // Reset form
+      // Clear draft and reset form
+      localStorage.removeItem(DRAFT_KEY);
       setIssueType('');
       setDescription('');
       setLocation('');
@@ -443,9 +478,11 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
 
   const sidebarItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav_home'), active: activeTab === 'home', onClick: () => setActiveTab('home') },
+    { icon: <Truck className="w-5 h-5" />, label: 'Book Collection', active: activeTab === 'collection', onClick: () => setActiveTab('collection') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_education'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <AlertTriangle className="w-5 h-5" />, label: t('nav_report'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
     { icon: <History className="w-5 h-5" />, label: t('nav_track'), active: activeTab === 'track', onClick: () => setActiveTab('track') },
+    { icon: <Trophy className="w-5 h-5" />, label: t('nav_rewards'), active: activeTab === 'rewards', onClick: () => setActiveTab('rewards') },
     { icon: <Settings className="w-5 h-5" />, label: t('settings'), active: activeTab === 'settings', onClick: () => setActiveTab('settings') },
     { icon: <UserCircle className="w-5 h-5" />, label: t('profile'), active: activeTab === 'profile', onClick: () => setActiveTab('profile') },
   ];
@@ -456,6 +493,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     const totalReports = myComplaints.length;
     const areaScore = totalReports > 0 ? ((resolvedCount / totalReports) * 10).toFixed(1) : 'N/A';
     const recentReports = myComplaints.slice(0, 3); // Top 3 most recent
+    const totalPoints = totalReports * 10 + resolvedCount * 50 + Math.floor(trainingProgress / 25) * 25;
 
     switch (activeTab) {
       case 'home':
@@ -476,28 +514,41 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
                 title={t('stat_reports')}
                 value={totalReports.toString()}
                 icon={<ClipboardList className="w-6 h-6" />}
-                trend={{ value: '2', isPositive: true }}
+                trend={{ value: progressCount > 0 ? `${progressCount} in progress` : 'All clear', isPositive: true }}
                 color="blue"
               />
               <StatCard
                 title={t('stat_resolved')}
                 value={resolvedCount.toString()}
                 icon={<Star className="w-6 h-6" />}
-                trend={{ value: '1', isPositive: true }}
+                trend={{ value: totalReports > 0 ? `${Math.round((resolvedCount / totalReports) * 100)}%` : '0%', isPositive: true }}
                 color="green"
               />
               <StatCard
                 title={t('stat_training')}
                 value={`${trainingProgress}%`}
                 icon={<GraduationCap className="w-6 h-6" />}
-                trend={{ value: '25%', isPositive: true }}
+                trend={{ value: trainingProgress >= 100 ? 'Complete!' : 'In progress', isPositive: true }}
                 color="yellow"
               />
+              <div
+                onClick={() => setActiveTab('rewards')}
+                className="cursor-pointer"
+                title="View Rewards"
+              >
+                <StatCard
+                  title={t('stat_points')}
+                  value={totalPoints.toString()}
+                  icon={<Trophy className="w-6 h-6" />}
+                  trend={{ value: '🏆 View badges', isPositive: true }}
+                  color="purple"
+                />
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
@@ -789,7 +840,12 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                 </div>
 
                 <div className="flex gap-4">
-                  <button type="button" className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={!issueType && !description}
+                    className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
                     {t('save_draft')}
                   </button>
                   <button
@@ -942,6 +998,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
           </div >
         );
 
+      case 'collection':
+        return <OnDemandCollectionTab userId={user.id} userAddress={user.address || ''} />;
+      case 'rewards':
+        return <RewardsTab complaints={myComplaints} trainingProgress={trainingProgress} />;
       case 'training':
         return <TrainingSystem user={user} />;
       case 'settings': return <SettingsTab />;
@@ -965,4 +1025,506 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
   );
 };
 
+// ─── On-Demand Collection Sub-Component ──────────────────────────────────────
+
+interface Booking {
+  id: string;
+  type: 'immediate' | 'scheduled';
+  address: string;
+  wasteType: string;
+  scheduledDate?: string;
+  scheduledTime?: string;
+  notes: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  createdAt: any;
+}
+
+const WASTE_TYPES = [
+  'Household Waste', 'Dry Recyclables', 'Wet/Organic Waste',
+  'E-Waste', 'Bulk Items / Furniture', 'Construction Debris', 'Medical Waste',
+];
+
+const BOOKING_STATUS_COLORS: Record<string, string> = {
+  pending:   'bg-yellow-100 text-yellow-800',
+  confirmed: 'bg-blue-100 text-blue-800',
+  completed: 'bg-green-100 text-green-800',
+  cancelled: 'bg-red-100 text-red-800',
+};
+
+const OnDemandCollectionTab: React.FC<{ userId: string; userAddress: string }> = ({ userId, userAddress }) => {
+  const { error: toastError, warning: toastWarning } = useToast();
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tab, setTab] = useState<'immediate' | 'schedule'>('immediate');
+  const [success, setSuccess] = useState('');
+
+  const [form, setForm] = useState({
+    address: userAddress || '',
+    wasteType: '',
+    scheduledDate: '',
+    scheduledTime: '08:00',
+    notes: '',
+  });
+
+  React.useEffect(() => {
+    const q = query(
+      collection(db, 'collection_bookings'),
+      where('userId', '==', userId)
+    );
+    const unsub = onSnapshot(q, snap => {
+      const list: Booking[] = [];
+      snap.forEach(d => list.push({ id: d.id, ...d.data() } as Booking));
+      list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setBookings(list);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [userId]);
+
+  const handleBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.address || !form.wasteType) {
+      toastWarning('Please fill in address and waste type.');
+      return;
+    }
+    if (tab === 'schedule' && !form.scheduledDate) {
+      toastWarning('Please select a date for the scheduled pickup.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const data: any = {
+        userId,
+        type: tab === 'immediate' ? 'immediate' : 'scheduled',
+        address: form.address,
+        wasteType: form.wasteType,
+        notes: form.notes,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      };
+      if (tab === 'schedule') {
+        data.scheduledDate = form.scheduledDate;
+        data.scheduledTime = form.scheduledTime;
+      }
+      await addDoc(collection(db, 'collection_bookings'), data);
+      setSuccess(tab === 'immediate'
+        ? '✅ Pickup request sent! Our team will arrive shortly.'
+        : `✅ Pickup scheduled for ${new Date(form.scheduledDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })} at ${form.scheduledTime}.`
+      );
+      setForm(prev => ({ ...prev, wasteType: '', notes: '', scheduledDate: '' }));
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      console.error('Booking error:', err);
+      toastError('Failed to submit booking. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const pendingCount = bookings.filter(b => b.status === 'pending').length;
+  const completedCount = bookings.filter(b => b.status === 'completed').length;
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().slice(0, 10);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Garbage Collection</h2>
+        <p className="text-gray-500">Request an immediate pickup or schedule one in advance</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard
+          title="Total Bookings"
+          value={loading ? '...' : bookings.length.toString()}
+          icon={<Truck className="w-6 h-6" />}
+          color="blue"
+        />
+        <StatCard
+          title="Pending"
+          value={loading ? '...' : pendingCount.toString()}
+          icon={<Clock className="w-6 h-6" />}
+          trend={{ value: 'Awaiting pickup', isPositive: false }}
+          color="yellow"
+        />
+        <StatCard
+          title="Completed"
+          value={loading ? '...' : completedCount.toString()}
+          icon={<CheckCircle className="w-6 h-6" />}
+          trend={{ value: 'All time', isPositive: true }}
+          color="green"
+        />
+      </div>
+
+      {/* Booking Form */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setTab('immediate')}
+            className={`flex-1 py-4 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${tab === 'immediate' ? 'text-emerald-700 bg-emerald-50 border-b-2 border-emerald-500' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+          >
+            <PhoneCall className="w-4 h-4" />
+            Request Now
+          </button>
+          <button
+            onClick={() => setTab('schedule')}
+            className={`flex-1 py-4 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${tab === 'schedule' ? 'text-blue-700 bg-blue-50 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+          >
+            <CalendarPlus className="w-4 h-4" />
+            Schedule in Advance
+          </button>
+        </div>
+
+        <form onSubmit={handleBook} className="p-6 space-y-5">
+          {success && (
+            <div className="p-4 bg-green-50 text-green-800 rounded-xl border border-green-200 font-medium text-sm">
+              {success}
+            </div>
+          )}
+
+          {tab === 'immediate' && (
+            <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-100 rounded-xl">
+              <Truck className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-orange-900 text-sm">On-Demand Pickup</p>
+                <p className="text-orange-700 text-xs mt-0.5">Our nearest available team will be dispatched to your location. Estimated arrival: 2–4 hours.</p>
+              </div>
+            </div>
+          )}
+
+          {tab === 'schedule' && (
+            <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+              <Calendar className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-blue-900 text-sm">Scheduled Pickup</p>
+                <p className="text-blue-700 text-xs mt-0.5">Choose a date and time window. We'll confirm within 2 hours of your booking.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Address */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Pickup Address <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                required
+                value={form.address}
+                onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
+                placeholder="Your full pickup address"
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Waste Type */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Waste Type <span className="text-red-500">*</span>
+            </label>
+            <select
+              required
+              value={form.wasteType}
+              onChange={e => setForm(p => ({ ...p, wasteType: e.target.value }))}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-sm appearance-none"
+            >
+              <option value="">Select waste type...</option>
+              {WASTE_TYPES.map(wt => <option key={wt} value={wt}>{wt}</option>)}
+            </select>
+          </div>
+
+          {/* Date + Time (schedule only) */}
+          {tab === 'schedule' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Date <span className="text-red-500">*</span></label>
+                <input
+                  type="date"
+                  required
+                  min={minDate}
+                  value={form.scheduledDate}
+                  onChange={e => setForm(p => ({ ...p, scheduledDate: e.target.value }))}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Preferred Time</label>
+                <select
+                  value={form.scheduledTime}
+                  onChange={e => setForm(p => ({ ...p, scheduledTime: e.target.value }))}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all text-sm"
+                >
+                  <option value="07:00">7:00 AM – 9:00 AM</option>
+                  <option value="09:00">9:00 AM – 11:00 AM</option>
+                  <option value="11:00">11:00 AM – 1:00 PM</option>
+                  <option value="14:00">2:00 PM – 4:00 PM</option>
+                  <option value="16:00">4:00 PM – 6:00 PM</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Additional Notes</label>
+            <textarea
+              rows={2}
+              value={form.notes}
+              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+              placeholder="e.g. Ring bell, leave at door, large items need assistance..."
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 transition-all text-sm"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={`w-full py-3.5 text-white rounded-xl font-semibold transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-sm ${tab === 'immediate' ? 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700' : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'}`}
+          >
+            {isSubmitting ? (
+              <><Loader2 className="w-5 h-5 animate-spin" /> Booking...</>
+            ) : tab === 'immediate' ? (
+              <><Truck className="w-5 h-5" /> Request Pickup Now</>
+            ) : (
+              <><CalendarPlus className="w-5 h-5" /> Schedule Pickup</>
+            )}
+          </button>
+        </form>
+      </div>
+
+      {/* Bookings List */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <h3 className="font-semibold text-gray-900">Your Bookings</h3>
+        </div>
+        {loading ? (
+          <div className="flex justify-center p-10"><Loader2 className="w-7 h-7 animate-spin text-emerald-500" /></div>
+        ) : bookings.length === 0 ? (
+          <div className="p-10 text-center text-gray-400 text-sm">No bookings yet. Request your first pickup above.</div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {bookings.map(b => (
+              <div key={b.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-xl flex-shrink-0 mt-0.5 ${b.type === 'immediate' ? 'bg-orange-100' : 'bg-blue-100'}`}>
+                    {b.type === 'immediate' ? <PhoneCall className="w-4 h-4 text-orange-600" /> : <Calendar className="w-4 h-4 text-blue-600" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{b.wasteType}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> {b.address.slice(0, 50)}{b.address.length > 50 ? '...' : ''}
+                    </p>
+                    {b.scheduledDate && (
+                      <p className="text-xs text-blue-600 mt-0.5 font-medium">
+                        📅 {new Date(b.scheduledDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {b.scheduledTime}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {b.type === 'immediate' ? 'On-demand' : 'Scheduled'} · #{b.id.slice(-6).toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+                <span className={`self-start sm:self-auto px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${BOOKING_STATUS_COLORS[b.status] || 'bg-gray-100 text-gray-600'}`}>
+                  {b.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default CitizenDashboard;
+
+// ─── Citizen Rewards Tab ──────────────────────────────────────────────────────
+
+interface RewardsBadge {
+  id: string;
+  icon: string;
+  label: string;
+  desc: string;
+  condition: (complaints: { status: string }[], training: number) => boolean;
+}
+
+const REWARD_BADGES: RewardsBadge[] = [
+  { id: 'first', icon: '🌱', label: 'First Step', desc: 'Submit your first report', condition: (c) => c.length >= 1 },
+  { id: 'reporter5', icon: '📊', label: 'Active Reporter', desc: 'Submit 5 reports', condition: (c) => c.length >= 5 },
+  { id: 'reporter10', icon: '🏆', label: 'Super Citizen', desc: 'Submit 10 reports', condition: (c) => c.length >= 10 },
+  { id: 'resolver3', icon: '⭐', label: 'Problem Solver', desc: 'Get 3 issues resolved', condition: (c) => c.filter(x => ['RESOLVED', 'CLOSED'].includes(x.status)).length >= 3 },
+  { id: 'resolver10', icon: '🎯', label: 'Impact Maker', desc: 'Get 10 issues resolved', condition: (c) => c.filter(x => ['RESOLVED', 'CLOSED'].includes(x.status)).length >= 10 },
+  { id: 'training25', icon: '📚', label: 'Learner', desc: 'Complete 25% of training', condition: (_, t) => t >= 25 },
+  { id: 'training100', icon: '🎓', label: 'Graduate', desc: 'Complete all training', condition: (_, t) => t >= 100 },
+  {
+    id: 'points500', icon: '🌟', label: 'Star Volunteer', desc: 'Earn 500+ points',
+    condition: (c, t) => {
+      const resolved = c.filter(x => ['RESOLVED', 'CLOSED'].includes(x.status)).length;
+      return c.length * 10 + resolved * 50 + Math.floor(t / 25) * 25 >= 500;
+    },
+  },
+];
+
+interface RewardsTabProps {
+  complaints: { id: string; status: string }[];
+  trainingProgress: number;
+}
+
+const RewardsTab: React.FC<RewardsTabProps> = ({ complaints, trainingProgress }) => {
+  const resolvedCount = complaints.filter(c => ['RESOLVED', 'CLOSED'].includes(c.status)).length;
+  const trainingPts = Math.floor(trainingProgress / 25) * 25;
+  const totalPoints = complaints.length * 10 + resolvedCount * 50 + trainingPts;
+  const earnedBadges = REWARD_BADGES.filter(b => b.condition(complaints, trainingProgress));
+
+  const TIERS = [
+    { name: 'Bronze', min: 0, max: 199, color: 'from-amber-700 to-amber-500', icon: '🥉' },
+    { name: 'Silver', min: 200, max: 499, color: 'from-slate-500 to-slate-400', icon: '🥈' },
+    { name: 'Gold', min: 500, max: 999, color: 'from-yellow-500 to-amber-400', icon: '🥇' },
+    { name: 'Platinum', min: 1000, max: 999999, color: 'from-cyan-500 to-teal-400', icon: '💎' },
+  ];
+  const tierIdx = Math.max(0, TIERS.findIndex(t => totalPoints >= t.min && totalPoints <= t.max));
+  const currentTier = TIERS[tierIdx];
+  const nextTier = TIERS[tierIdx + 1];
+  const progressPct = nextTier
+    ? Math.round(((totalPoints - currentTier.min) / (nextTier.min - currentTier.min)) * 100)
+    : 100;
+
+  const breakdown = [
+    { icon: '📋', label: 'Reports Submitted', count: complaints.length, rate: 10 },
+    { icon: '✅', label: 'Issues Resolved', count: resolvedCount, rate: 50 },
+    { icon: '🎓', label: 'Training Milestones', count: Math.floor(trainingProgress / 25), rate: 25 },
+  ];
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-1">Rewards &amp; Points</h2>
+        <p className="text-gray-600">Earn points for civic participation and unlock achievement badges</p>
+      </div>
+
+      {/* Hero Points Card */}
+      <div className={`bg-gradient-to-r ${currentTier.color} rounded-2xl p-6 text-white shadow-lg`}>
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <div className="text-sm font-medium opacity-80 mb-1 uppercase tracking-wider">{currentTier.icon} {currentTier.name} Tier</div>
+            <div className="text-6xl font-black mb-1">{totalPoints.toLocaleString()}</div>
+            <div className="text-sm opacity-80">Total Points Earned</div>
+          </div>
+          {nextTier ? (
+            <div className="bg-white/15 rounded-xl p-4 min-w-[170px]">
+              <div className="text-sm opacity-90 mb-1">Next: {nextTier.icon} {nextTier.name}</div>
+              <div className="text-lg font-bold mb-2">{(nextTier.min - totalPoints).toLocaleString()} pts to go</div>
+              <div className="w-full bg-white/25 rounded-full h-2">
+                <div className="bg-white h-2 rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }} />
+              </div>
+              <div className="text-xs opacity-70 mt-1">{progressPct}% to {nextTier.name}</div>
+            </div>
+          ) : (
+            <div className="bg-white/15 rounded-xl p-4">
+              <div className="text-sm opacity-90">🏆 Maximum Tier Reached!</div>
+              <div className="text-lg font-bold mt-1">Elite Member</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Total Reports', value: complaints.length, bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-100' },
+          { label: 'Issues Resolved', value: resolvedCount, bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100' },
+          { label: 'Badges Earned', value: earnedBadges.length, bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-100' },
+        ].map(s => (
+          <div key={s.label} className={`${s.bg} ${s.text} border ${s.border} rounded-xl p-4 text-center`}>
+            <div className="text-2xl font-black">{s.value}</div>
+            <div className="text-xs font-medium mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Points Breakdown */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Points Breakdown</h3>
+        <div className="space-y-3">
+          {breakdown.map(item => (
+            <div key={item.label} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{item.icon}</span>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">{item.label}</p>
+                  <p className="text-xs text-gray-500">{item.count} × {item.rate} pts each</p>
+                </div>
+              </div>
+              <span className="text-lg font-bold text-emerald-600">+{item.count * item.rate}</span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+            <span className="font-bold text-gray-900">Total Points</span>
+            <span className="text-xl font-bold text-emerald-700">{totalPoints}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Badges Grid */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Achievement Badges</h3>
+          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+            {earnedBadges.length} / {REWARD_BADGES.length} earned
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {REWARD_BADGES.map(badge => {
+            const earned = badge.condition(complaints, trainingProgress);
+            return (
+              <div
+                key={badge.id}
+                className={`flex flex-col items-center p-4 rounded-xl border-2 text-center transition-all duration-300 ${
+                  earned ? 'border-emerald-200 bg-emerald-50 shadow-sm' : 'border-gray-100 bg-gray-50 grayscale opacity-50'
+                }`}
+              >
+                <span className="text-3xl mb-2">{badge.icon}</span>
+                <span className="text-sm font-semibold text-gray-900">{badge.label}</span>
+                <span className="text-xs text-gray-500 mt-1 leading-tight">{badge.desc}</span>
+                {earned && (
+                  <span className="mt-2 text-[9px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    ✓ Earned
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* How to Earn More */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">How to Earn More Points</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { icon: '📋', action: 'Submit a Report', pts: '+10 pts', desc: 'Report any civic waste issue with photo evidence' },
+            { icon: '✅', action: 'Issue Gets Resolved', pts: '+50 pts', desc: 'Earn a bonus when your reported issue is resolved' },
+            { icon: '🎓', action: 'Complete Training', pts: '+25 pts', desc: 'Per 25% milestone completed in the training modules' },
+          ].map(item => (
+            <div key={item.action} className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-start gap-3 border border-gray-100">
+              <span className="text-2xl mt-0.5 flex-shrink-0">{item.icon}</span>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">{item.action}</p>
+                <p className="text-emerald-600 font-bold text-base">{item.pts}</p>
+                <p className="text-xs text-gray-500 mt-1">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};

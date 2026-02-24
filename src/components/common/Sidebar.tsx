@@ -71,6 +71,18 @@ const Sidebar: React.FC<SidebarProps> = ({
         ].join(' ')}
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
       >
+        {/* Logo Header */}
+        <div className={`flex-shrink-0 px-4 py-3 border-b border-gray-100 flex items-center gap-3 overflow-hidden ${isCollapsed ? 'lg:justify-center' : ''}`}>
+          <img
+            src="/logo.png"
+            alt="SafaiConnect"
+            className="w-9 h-9 object-contain flex-shrink-0 rounded-lg"
+          />
+          <span className={`font-bold text-gray-900 text-base whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'lg:hidden' : ''}`}>
+            SafaiConnect
+          </span>
+        </div>
+
         <nav className="p-4 sm:p-6 flex-1 overflow-y-auto overscroll-contain touch-pan-y">
           <ul className="space-y-2">
             {items.map((item, index) => (

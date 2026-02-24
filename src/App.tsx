@@ -123,32 +123,12 @@ function App() {
     preferences: userProfile.preferences,
   };
 
-  // Debug logging
-  console.log('🔍 Firestore Role:', userProfile.role);
-  console.log('🔍 Normalized Role:', activeUser.role);
-  console.log('🔍 Full User Profile:', userProfile);
-
   const renderDashboard = () => {
-    console.log('🎯 Rendering dashboard for role:', activeUser.role);
-    console.log('🎯 Role type:', typeof activeUser.role);
-    console.log('🎯 Active User:', activeUser);
-    
-    // Force re-evaluation
-    if (activeUser.role === 'superadmin') {
-      console.log('✅ Matched SUPERADMIN');
-      return <SuperadminDashboard user={activeUser} onLogout={handleLogout} />;
-    } else if (activeUser.role === 'admin') {
-      console.log('✅ Matched ADMIN');
-      return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
-    } else if (activeUser.role === 'worker') {
-      console.log('✅ Matched WORKER');
-      return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
-    } else if (activeUser.role === 'citizen') {
-      console.log('✅ Matched CITIZEN');
-      return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
-    } else {
-      console.log('❌ NO MATCH - defaulting to CITIZEN. Role:', activeUser.role);
-      return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
+    switch (activeUser.role) {
+      case 'superadmin': return <SuperadminDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'admin':      return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'worker':     return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
+      default:           return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
     }
   };
 

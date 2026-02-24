@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     ArrowRight, BarChart3, Users, Shield, Menu, X, Globe,
     Recycle, Download, MapPin, Bell, CheckCircle, Zap, Star,
-    ChevronDown, Smartphone, Lock, TrendingUp,
+    ChevronDown, Smartphone, Lock, TrendingUp, Mail, Phone,
+    Building2, Target, Award, Send,
 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
 
 interface LandingPageProps {
     onGetStarted: () => void;
@@ -35,6 +37,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
     const statsRef = useRef<HTMLDivElement>(null);
     const { isInstallable, installApp } = usePWAInstall();
     const { t } = useLanguage();
+    const { info: toastInfo, success: toastSuccess } = useToast();
 
     const c1 = useCounter(50000, 2000, statsVisible);
     const c2 = useCounter(1200, 2000, statsVisible);
@@ -65,16 +68,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
         if (isInstallable) {
             installApp();
         } else {
-            alert('To install SafaiConnect:\n\nDesktop: Click the install icon in your address bar.\nMobile: Tap "Share" → "Add to Home Screen".');
+            toastInfo('To install: Desktop — click the install icon in your address bar. Mobile — tap "Share" → "Add to Home Screen".');
         }
     };
 
     // Data structures with translations
     const navItems = [
         { id: 'features', label: t('nav_features') },
-        { id: 'impact', label: t('nav_impact') },
-        { id: 'solutions', label: t('nav_solutions') },
         { id: 'about', label: t('nav_about') },
+        { id: 'solutions', label: t('nav_solutions') },
+        { id: 'contact', label: t('nav_contact') },
     ];
 
     const stats = [
@@ -359,6 +362,135 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                                 <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
                             </div>
                         ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── ABOUT ─── */}
+            <section id="about" className="py-24 px-4 bg-gray-50 border-t border-gray-100">
+                <div className="container mx-auto md:px-8">
+                    <div className="text-center mb-16">
+                        <p className="text-emerald-600 text-sm font-bold uppercase tracking-widest mb-3">{t('nav_about')}</p>
+                        <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{t('about_title')}</h2>
+                        <p className="text-gray-600 text-lg max-w-2xl mx-auto">{t('about_subtitle')}</p>
+                    </div>
+
+                    {/* Mission */}
+                    <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-gray-100 mb-12">
+                        <div className="flex flex-col md:flex-row gap-8 items-center">
+                            <div className="flex-shrink-0">
+                                <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center">
+                                    <Target className="w-10 h-10 text-emerald-600" />
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-2xl font-bold text-gray-900 mb-3">{t('about_mission_title')}</h3>
+                                <p className="text-gray-600 text-lg leading-relaxed">{t('about_mission_desc')}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Three Pillars */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                        {[
+                            { icon: Users, title: t('about_pillar1_title'), desc: t('about_pillar1_desc'), color: 'text-blue-600', bg: 'bg-blue-50' },
+                            { icon: BarChart3, title: t('about_pillar2_title'), desc: t('about_pillar2_desc'), color: 'text-purple-600', bg: 'bg-purple-50' },
+                            { icon: Shield, title: t('about_pillar3_title'), desc: t('about_pillar3_desc'), color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                        ].map((p, i) => (
+                            <div key={i} className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                                <div className={`w-14 h-14 ${p.bg} rounded-2xl flex items-center justify-center mb-5`}>
+                                    <p.icon className={`w-7 h-7 ${p.color}`} />
+                                </div>
+                                <h4 className="text-xl font-bold text-gray-900 mb-3">{p.title}</h4>
+                                <p className="text-gray-500 text-sm leading-relaxed">{p.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* About Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                            { value: '25+', label: t('about_stat1_label'), icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
+                            { value: '1.2L+', label: t('about_stat2_label'), icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                            { value: '4,500+', label: t('about_stat3_label'), icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
+                            { value: '2.8L+', label: t('about_stat4_label'), icon: Award, color: 'text-orange-600', bg: 'bg-orange-50' },
+                        ].map((s, i) => (
+                            <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 text-center">
+                                <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mx-auto mb-3`}>
+                                    <s.icon className={`w-5 h-5 ${s.color}`} />
+                                </div>
+                                <div className="text-3xl font-black text-gray-900 mb-1">{s.value}</div>
+                                <div className="text-sm text-gray-500 font-medium">{s.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── CONTACT ─── */}
+            <section id="contact" className="py-24 px-4 bg-white border-t border-gray-100">
+                <div className="container mx-auto md:px-8">
+                    <div className="text-center mb-16">
+                        <p className="text-emerald-600 text-sm font-bold uppercase tracking-widest mb-3">{t('nav_contact')}</p>
+                        <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{t('contact_title')}</h2>
+                        <p className="text-gray-600 text-lg max-w-xl mx-auto">{t('contact_subtitle')}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-5xl mx-auto">
+                        {/* Contact Info */}
+                        <div className="space-y-6">
+                            {[
+                                { icon: Mail, label: t('contact_email_label'), value: t('contact_email_value'), color: 'text-blue-600', bg: 'bg-blue-50' },
+                                { icon: Phone, label: t('contact_phone_label'), value: t('contact_phone_value'), color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                { icon: MapPin, label: t('contact_address_label'), value: t('contact_address_value'), color: 'text-purple-600', bg: 'bg-purple-50' },
+                            ].map((c, i) => (
+                                <div key={i} className="flex items-start gap-5 p-6 bg-gray-50 rounded-2xl border border-gray-100 hover:shadow-sm transition-shadow">
+                                    <div className={`w-12 h-12 ${c.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                                        <c.icon className={`w-6 h-6 ${c.color}`} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{c.label}</p>
+                                        <p className="text-gray-800 font-medium">{c.value}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Contact Form */}
+                        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); toastSuccess(t('contact_sent_success')); }}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <input
+                                    type="text"
+                                    placeholder={t('contact_form_name')}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"
+                                    required
+                                />
+                                <input
+                                    type="email"
+                                    placeholder={t('contact_form_email')}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"
+                                    required
+                                />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder={t('contact_form_subject')}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400"
+                            />
+                            <textarea
+                                rows={5}
+                                placeholder={t('contact_form_message')}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 resize-none"
+                                required
+                            />
+                            <button
+                                type="submit"
+                                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                            >
+                                <Send className="w-5 h-5" />
+                                {t('contact_send_btn')}
+                            </button>
+                        </form>
                     </div>
                 </div>
             </section>

@@ -6,6 +6,7 @@ import {
 import StatCard from '../../common/StatCard';
 import { collection, query, onSnapshot, doc, updateDoc, getDocs, where, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface Complaint {
     id: string;
@@ -35,6 +36,7 @@ interface Evidence {
 }
 
 const ComplaintsTab: React.FC = () => {
+    const { error: toastError } = useToast();
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [loading, setLoading] = useState(true);
@@ -51,6 +53,8 @@ const ComplaintsTab: React.FC = () => {
     const [isReviewing, setIsReviewing] = useState(false);
 
     const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Fetch complaints in real-time
     useEffect(() => {
@@ -156,21 +160,28 @@ const ComplaintsTab: React.FC = () => {
             setSelectedComplaintForReview(null);
         } catch (error) {
             console.error("Error updating complaint:", error);
-            alert("Failed to update status.");
+            toastError("Failed to update status.");
         } finally {
             setIsReviewing(false);
         }
     };
 
-    const handleDelete = async (complaintId: string) => {
+    const handleDelete = (complaintId: string) => {
         setActiveDropdown(null);
-        if (window.confirm("Are you sure you want to delete this complaint permanently?")) {
-            try {
-                await deleteDoc(doc(db, 'complaints', complaintId));
-            } catch (error) {
-                console.error("Error deleting complaint:", error);
-                alert("Failed to delete. Super Admin privileges required.");
-            }
+        setDeleteConfirmId(complaintId);
+    };
+
+    const executeDelete = async () => {
+        if (!deleteConfirmId) return;
+        setIsDeleting(true);
+        try {
+            await deleteDoc(doc(db, 'complaints', deleteConfirmId));
+            setDeleteConfirmId(null);
+        } catch (error) {
+            console.error("Error deleting complaint:", error);
+            toastError("Failed to delete. Super Admin privileges required.");
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -215,7 +226,7 @@ const ComplaintsTab: React.FC = () => {
             setSelectedWorkerIds([]);
         } catch (error) {
             console.error("Error assigning workers:", error);
-            alert("Failed to assign workers.");
+            toastError("Failed to assign workers.");
         } finally {
             setIsAssigning(false);
         }
@@ -412,6 +423,40 @@ const ComplaintsTab: React.FC = () => {
                                 {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                 Assign {selectedWorkerIds.length > 0 ? `(${selectedWorkerIds.length})` : ''}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirmId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+                        <div className="p-6 text-center">
+                            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 className="w-7 h-7 text-red-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Complaint?</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                This will permanently remove the complaint and cannot be undone. Super Admin privileges are required.
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                <button
+                                    onClick={() => setDeleteConfirmId(null)}
+                                    disabled={isDeleting}
+                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={executeDelete}
+                                    disabled={isDeleting}
+                                    className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                    Delete
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

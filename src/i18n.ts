@@ -4,28 +4,33 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import en from './locales/en.json';
 import hi from './locales/hi.json';
+import mr from './locales/mr.json';
+import ur from './locales/ur.json';
+import ta from './locales/ta.json';
+import te from './locales/te.json';
+import gu from './locales/gu.json';
+import bn from './locales/bn.json';
+import kn from './locales/kn.json';
 
 i18n
-    // detect user language
-    // learn more: https://github.com/i18next/i18next-browser-languageDetector
     .use(LanguageDetector)
-    // pass the i18n instance to react-i18next.
     .use(initReactI18next)
-    // init i18next
-    // for all options read: https://www.i18next.com/overview/configuration-options
     .init({
-        debug: true,
+        debug: false,
         fallbackLng: 'en',
         interpolation: {
-            escapeValue: false, // not needed for react as it escapes by default
+            escapeValue: false,
         },
         resources: {
-            en: {
-                translation: en
-            },
-            hi: {
-                translation: hi
-            }
+            en: { translation: en },
+            hi: { translation: hi },
+            mr: { translation: mr },
+            ur: { translation: ur },
+            ta: { translation: ta },
+            te: { translation: te },
+            gu: { translation: gu },
+            bn: { translation: bn },
+            kn: { translation: kn },
         }
     });
 

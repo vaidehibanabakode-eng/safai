@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { LogIn, ArrowLeft, ShieldCheck, Mail, Lock } from 'lucide-react';
+import { LogIn, ArrowLeft, ShieldCheck, Mail, Lock, Zap } from 'lucide-react';
 import { User } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
+import LanguageSwitcher from './common/LanguageSwitcher';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -148,13 +149,16 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 bg-white">
         <div className="w-full max-w-md space-y-6 sm:space-y-8 animate-in slide-in-from-right duration-500">
           <div className="text-center lg:text-left">
-            <button
-              onClick={onBack}
-              className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-6 sm:mb-8 group"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-              {t('back_home')}
-            </button>
+            <div className="flex items-center justify-between mb-6 sm:mb-8">
+              <button
+                onClick={onBack}
+                className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors group"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+                {t('back_home')}
+              </button>
+              <LanguageSwitcher />
+            </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('sign_in')}</h2>
             <p className="mt-2 text-sm sm:text-base text-gray-600">{t('enter_details')}</p>
           </div>
@@ -240,8 +244,38 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
             </button>
           </form>
 
-          <div className="pt-6 border-t border-gray-100">
-            <p className="text-center text-sm text-gray-600 mb-6">
+          {/* ── Quick Demo Access ─────────────────────────────────────────── */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span className="text-sm font-bold text-amber-800">{t('quick_demo')}</span>
+            </div>
+            <p className="text-xs text-amber-600 mb-3">Click a role to auto-fill demo credentials, then press Sign In.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { role: 'Citizen',    email: 'demo.citizen@safaiconnect.in',    icon: '🏘️', cls: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
+                { role: 'Worker',     email: 'demo.worker@safaiconnect.in',     icon: '👷', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100' },
+                { role: 'Admin',      email: 'demo.admin@safaiconnect.in',      icon: '📊', cls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
+                { role: 'Super Admin',email: 'demo.superadmin@safaiconnect.in', icon: '🛡️', cls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
+              ].map(d => (
+                <button
+                  key={d.role}
+                  type="button"
+                  onClick={() => { setEmail(d.email); setPassword('Demo@1234'); }}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${d.cls}`}
+                >
+                  <span>{d.icon}</span>
+                  <span>{d.role}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-amber-500 mt-2 text-center">
+              Password: <code className="bg-amber-100 px-1 rounded font-mono">Demo@1234</code> · Set up these accounts in Firebase first
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-center text-sm text-gray-600">
               {t('dont_have_account')}{' '}
               <button
                 onClick={onNavigateToSignup}
