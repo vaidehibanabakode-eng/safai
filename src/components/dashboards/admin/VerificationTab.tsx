@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useToast } from '../../../contexts/ToastContext';
+import { useNotifications } from '../../../contexts/NotificationContext';
 
 interface VerificationEntry {
     assignmentId: string;
@@ -28,6 +29,7 @@ interface VerificationEntry {
 
 const VerificationTab: React.FC = () => {
     const { error: toastError } = useToast();
+    const { addNotification } = useNotifications();
     const [entries, setEntries] = useState<VerificationEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [approvedCount, setApprovedCount] = useState(0);
@@ -117,6 +119,15 @@ const VerificationTab: React.FC = () => {
                 } catch (e) {
                     console.warn('Could not increment reward points:', e);
                 }
+            }
+            // Notify the citizen
+            if (entry.citizenId) {
+                await addNotification(
+                    entry.citizenId,
+                    `Your complaint "${entry.complaintTitle}" has been resolved! You earned 10 reward points.`,
+                    'complaint_resolved',
+                    entry.complaintId
+                );
             }
             setIsModalOpen(false);
             setSelectedEntry(null);
