@@ -4,10 +4,11 @@ import {
     Trash2, Eye, UserPlus, X, Loader2
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { collection, query, onSnapshot, doc, updateDoc, getDocs, where, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, getDocs, getDoc, where, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useToast } from '../../../contexts/ToastContext';
 import { useNotifications } from '../../../contexts/NotificationContext';
+import { sendPushNotification } from '../../../lib/fcm';
 
 interface Complaint {
     id: string;
@@ -233,6 +234,22 @@ const ComplaintsTab: React.FC = () => {
                     'complaint_assigned',
                     selectedComplaintId || undefined
                 );
+            }
+
+            // Also send FCM push to each assigned worker
+            for (const wId of selectedWorkerIds) {
+                try {
+                    const userSnap = await getDoc(doc(db, 'users', wId));
+                    const fcmToken = userSnap.data()?.fcmToken as string | undefined;
+                    if (fcmToken) {
+                        await sendPushNotification(
+                            [fcmToken],
+                            '🗂️ New Task Assigned',
+                            `You have been assigned: ${assignedComplaint?.title ?? 'a new complaint'}`,
+                            { complaintId: selectedComplaintId ?? '' }
+                        );
+                    }
+                } catch { /* FCM push is non-critical */ }
             }
 
             setIsAssignModalOpen(false);

@@ -11,6 +11,7 @@ import {
 import { db } from '../../../lib/firebase';
 import { useToast } from '../../../contexts/ToastContext';
 import { useNotifications } from '../../../contexts/NotificationContext';
+import { sendPushNotification } from '../../../lib/fcm';
 
 interface VerificationEntry {
     assignmentId: string;
@@ -129,6 +130,19 @@ const VerificationTab: React.FC = () => {
                     entry.complaintId
                 );
             }
+            // FCM push to citizen
+            try {
+                const citizenSnap = await getDoc(doc(db, 'users', entry.citizenId ?? ''));
+                const fcmToken = citizenSnap.data()?.fcmToken as string | undefined;
+                if (fcmToken) {
+                    await sendPushNotification(
+                        [fcmToken],
+                        '✅ Complaint Resolved',
+                        `Your complaint "${entry.complaintTitle}" has been resolved! +10 reward points`,
+                        { complaintId: entry.complaintId }
+                    );
+                }
+            } catch { /* FCM push is non-critical */ }
             setIsModalOpen(false);
             setSelectedEntry(null);
         } catch (e) {
