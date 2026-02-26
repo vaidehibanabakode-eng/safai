@@ -88,6 +88,11 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     (transcript) => setDescription((prev) => prev ? `${prev} ${transcript}` : transcript),
   );
 
+  // AI category suggestion
+  const aiDismissedForRef = React.useRef<string>('');
+  const [aiSuggestion, setAiSuggestion] = useState<{ category: string; confidence: number } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
   interface Complaint {
     id: string;
     title: string;
@@ -166,6 +171,31 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     } catch { /* ignore corrupt draft */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
+
+  // AI auto-categorization: debounce 1.5s after description reaches 20 chars
+  React.useEffect(() => {
+    if (description.length < 20 || description === aiDismissedForRef.current) {
+      setAiSuggestion(null);
+      return;
+    }
+    setAiSuggestion(null);
+    const timer = setTimeout(async () => {
+      setAiLoading(true);
+      try {
+        const res = await fetch('/api/categorize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description, language }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { category: string; confidence: number };
+          setAiSuggestion(data);
+        }
+      } catch { /* fail silently — AI is non-blocking */ }
+      setAiLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [description, language]);
 
   const handleSaveDraft = () => {
     try {
@@ -662,6 +692,38 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                       <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
                       {t('listening')}
                     </p>
+                  )}
+                  {/* AI category suggestion chip */}
+                  {(aiLoading || aiSuggestion) && (
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {aiLoading && (
+                        <span className="flex items-center gap-1.5 text-xs text-purple-600 bg-purple-50 border border-purple-200 rounded-full px-3 py-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          AI analysing...
+                        </span>
+                      )}
+                      {aiSuggestion && !aiLoading && (
+                        <>
+                          <span className="text-xs text-purple-700 bg-purple-50 border border-purple-200 rounded-full px-3 py-1 font-medium">
+                            ✨ Suggested: {aiSuggestion.category} · {Math.round(aiSuggestion.confidence * 100)}%
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { setIssueType(aiSuggestion.category); setAiSuggestion(null); }}
+                            className="text-xs bg-purple-600 text-white rounded-full px-3 py-1 hover:bg-purple-700 transition-colors"
+                          >
+                            Use this
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { aiDismissedForRef.current = description; setAiSuggestion(null); }}
+                            className="text-xs text-gray-500 hover:text-gray-700 rounded-full px-2 py-1"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
 
