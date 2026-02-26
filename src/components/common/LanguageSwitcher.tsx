@@ -40,7 +40,7 @@ const LanguageSwitcher: React.FC = () => {
             >
                 <Globe className="w-4 h-4 text-green-600" />
                 <span className="hidden sm:inline">{current.nativeLabel}</span>
-                <span className="sm:hidden text-xs font-bold uppercase text-green-600">{current.code}</span>
+                <span className="sm:hidden text-xs font-semibold uppercase text-green-600">{current.code}</span>
             </button>
 
             {isOpen && (
