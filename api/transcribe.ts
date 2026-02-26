@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const transcript =
       data.results
-        ?.flatMap((r) => r.alternatives.map((a) => a.transcript))
+        ?.flatMap((r) => r.alternatives?.map((a) => a.transcript) ?? [])
         .join(' ')
         .trim() ?? '';
 
