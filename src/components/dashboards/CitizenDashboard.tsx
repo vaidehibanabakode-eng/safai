@@ -297,6 +297,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
   // ----------- GPS location state -----------
   const [location, setLocation] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
+  const [gpsLat, setGpsLat] = useState<number | null>(null);
+  const [gpsLng, setGpsLng] = useState<number | null>(null);
 
   const fetchLocation = async () => {
     setLocationLoading(true);
@@ -323,6 +325,9 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
         latitude = position.coords.latitude;
         longitude = position.coords.longitude;
       }
+
+      setGpsLat(latitude);
+      setGpsLng(longitude);
 
       try {
         const res = await fetch(
@@ -400,7 +405,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
         citizenId: user.id,
         imageUrl: imageUrl,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        ...(gpsLat !== null && gpsLng !== null && { lat: gpsLat, lng: gpsLng }),
       };
 
       await addDoc(collection(db, 'complaints'), complaintData);
@@ -412,6 +418,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       setDescription('');
       setLocation('');
       setPhotos([]);
+      setGpsLat(null);
+      setGpsLng(null);
 
       // Clear success message after 4s
       setTimeout(() => setSubmitSuccess(''), 4000);
