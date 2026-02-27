@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserCheck, Leaf } from 'lucide-react';
+import { UserCheck, Leaf, ArrowLeft } from 'lucide-react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
@@ -70,6 +70,15 @@ const ProfileSetupPage: React.FC = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+                {/* Back button */}
+                <button
+                    onClick={handleSignOut}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-6 group"
+                >
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                    Back to Login
+                </button>
+
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
                     <div className="bg-emerald-100 p-3 rounded-xl">
@@ -164,12 +173,6 @@ const ProfileSetupPage: React.FC = () => {
                     </button>
                 </form>
 
-                <button
-                    onClick={handleSignOut}
-                    className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                    Sign out and use a different account
-                </button>
             </div>
         </div>
     );
