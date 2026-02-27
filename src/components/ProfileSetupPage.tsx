@@ -47,7 +47,7 @@ const ProfileSetupPage: React.FC = () => {
                 role,
                 createdAt: serverTimestamp(),
                 memberSince: serverTimestamp(),
-                rewardPoints: role === 'Citizen' ? 0 : undefined,
+                ...(role === 'Citizen' && { rewardPoints: 0 }),
                 phone: '',
                 address: '',
                 citizenID: `CIT-${Math.floor(Math.random() * 1_000_000)}`,
