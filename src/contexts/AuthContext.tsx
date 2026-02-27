@@ -28,6 +28,7 @@ interface AuthContextType {
     currentUser: FirebaseUser | null;
     userProfile: UserProfile | null;
     loading: boolean;
+    profileIncomplete: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,10 +41,22 @@ export const useAuth = () => {
     return context;
 };
 
+// Maps every known role format → canonical Firestore-cased value used by App.tsx routing
+const ROLE_NORMALIZATION: Record<string, string> = {
+    'superadmin':    'Superadmin',
+    'super_admin':   'Superadmin',   // legacy setSuperAdmin.cjs format
+    'admin':         'Admin',
+    'worker':        'Worker',
+    'citizen':       'Citizen',
+    'green-champion':'Green-Champion',
+    'green_champion':'Green-Champion',
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [profileIncomplete, setProfileIncomplete] = useState(false);
 
     useEffect(() => {
         let unsubscribeProfile: (() => void) | null = null;
@@ -68,21 +81,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const docRef = doc(db, 'users', user.uid);
                 unsubscribeProfile = onSnapshot(docRef,
                     (docSnap: any) => {
-                        let firestoreData: any = null;
-                        if (docSnap.exists()) {
-                            firestoreData = docSnap.data();
+                        // ── No Firestore document → profile setup needed ─────────────
+                        if (!docSnap.exists()) {
+                            setUserProfile({
+                                uid: user.uid,
+                                email: user.email || '',
+                                name: user.displayName || '',
+                                role: '',
+                            });
+                            setProfileIncomplete(true);
+                            setLoading(false);
+                            return;
                         }
 
-                        // Resolve role from Firestore data — Firestore is the source of truth
-                        // Validate that the role is one of the allowed values
-                        let resolvedRole: string = 'Citizen';
-                        if (firestoreData && firestoreData.role) {
-                            const validRoles = ['citizen', 'worker', 'admin', 'superadmin', 'green-champion'];
-                            const normalizedRole = String(firestoreData.role).toLowerCase();
-                            if (validRoles.includes(normalizedRole)) {
-                                resolvedRole = firestoreData.role;
-                            }
-                        }
+                        const firestoreData = docSnap.data();
+
+                        // ── Normalize role — handle all known formats ─────────────────
+                        // e.g. 'Admin', 'SUPER_ADMIN', 'green-champion', 'worker' all work
+                        const rawRole = String(firestoreData?.role || '').toLowerCase();
+                        const resolvedRole = ROLE_NORMALIZATION[rawRole] || 'Citizen';
 
                         setUserProfile({
                             uid: user.uid,
@@ -99,22 +116,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             memberSince: firestoreData?.memberSince,
                             preferences: firestoreData?.preferences
                         });
+                        setProfileIncomplete(false);
                         setLoading(false);
                     },
                     (error: any) => {
-                        console.error("Error listening to user profile:", error);
-                        // Fallback
+                        console.error("[AuthContext] Firestore profile read error:", error);
+                        // Permission error or network issue — send to profile setup,
+                        // NOT silently to CitizenDashboard
                         setUserProfile({
                             uid: user.uid,
                             email: user.email || '',
                             name: user.displayName || 'User',
-                            role: 'Citizen',
+                            role: '',
                         });
+                        setProfileIncomplete(true);
                         setLoading(false);
                     }
                 );
             } else {
                 setUserProfile(null);
+                setProfileIncomplete(false);
                 setLoading(false);
             }
         });
@@ -128,7 +149,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const value = {
         currentUser,
         userProfile,
-        loading
+        loading,
+        profileIncomplete,
     };
 
     return (

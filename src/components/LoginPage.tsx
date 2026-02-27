@@ -54,50 +54,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
     setIsLoading(true);
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
-      const user = userCredential.user;
-
-      // Check if profile exists, if not create default one
-      const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
-      const { db } = await import('../lib/firebase');
-
-      const docRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(docRef);
-
-      // Only create profile if it doesn't exist
-      // If user previously signed up, keep their existing role
-      if (!docSnap.exists()) {
-        await setDoc(docRef, {
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName || 'Google User',
-          role: 'Citizen',
-          createdAt: serverTimestamp(),
-          rewardPoints: 0,
-          phone: '',
-          address: '',
-          citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
-          assignedZone: '',
-          memberSince: serverTimestamp(),
-          preferences: {
-            notifications: true,
-            language: 'en'
-          }
-        });
-      } else {
-        // Profile exists - just update name and email if needed
-        const existingData = docSnap.data();
-        if (existingData.name !== (user.displayName || 'Google User')) {
-          await setDoc(docRef, {
-            ...existingData,
-            name: user.displayName || 'Google User'
-          }, { merge: true });
-        }
-      }
-
+      // AuthContext's onAuthStateChanged fires automatically.
+      // If the Firestore doc exists → reads the real role → correct dashboard.
+      // If no Firestore doc → profileIncomplete = true → ProfileSetupPage shown.
+      // We do NOT create a Citizen doc here — that was overwriting real roles.
       onLogin({
-        id: user.uid,
-        email: user.email || '',
-        name: user.displayName || 'User',
+        id: userCredential.user.uid,
+        email: userCredential.user.email || '',
+        name: userCredential.user.displayName || 'User',
         role: 'citizen'
       });
     } catch (err: any) {
@@ -253,15 +217,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
             <p className="text-xs text-amber-600 mb-3">Click a role to auto-fill demo credentials, then press Sign In.</p>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { role: 'Citizen',    email: 'demo.citizen@safaiconnect.in',    icon: '🏘️', cls: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
-                { role: 'Worker',     email: 'demo.worker@safaiconnect.in',     icon: '👷', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100' },
-                { role: 'Admin',      email: 'demo.admin@safaiconnect.in',      icon: '📊', cls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
-                { role: 'Super Admin',email: 'demo.superadmin@safaiconnect.in', icon: '🛡️', cls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
+                { role: 'Citizen',    email: 'citizen@demo.com',    icon: '🏘️', cls: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
+                { role: 'Worker',     email: 'worker@demo.com',     icon: '👷', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100' },
+                { role: 'Admin',      email: 'admin@demo.com',      icon: '📊', cls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
+                { role: 'Super Admin',email: 'superadmin@demo.com', icon: '🛡️', cls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
               ].map(d => (
                 <button
                   key={d.role}
                   type="button"
-                  onClick={() => { setEmail(d.email); setPassword('Demo@1234'); }}
+                  onClick={() => { setEmail(d.email); setPassword('Demo1234!'); }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${d.cls}`}
                 >
                   <span>{d.icon}</span>
@@ -270,7 +234,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
               ))}
             </div>
             <p className="text-[10px] text-amber-500 mt-2 text-center">
-              Password: <code className="bg-amber-100 px-1 rounded font-mono">Demo@1234</code> · Set up these accounts in Firebase first
+              Password: <code className="bg-amber-100 px-1 rounded font-mono">Demo1234!</code> · Run <code className="bg-amber-100 px-1 rounded font-mono">npx tsx scripts/seed-demo.ts</code> to seed
             </p>
           </div>
 
