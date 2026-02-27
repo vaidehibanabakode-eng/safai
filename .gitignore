@@ -1,4 +1,7 @@
 node_modules
+.env
+.env.local
+.env.*.local
 public/sw.js
 public/workbox-*.js
 public/worker-*.js
