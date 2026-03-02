@@ -2,7 +2,6 @@ import React, { ReactNode, useState } from 'react';
 import { User } from '../../App';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import NotificationBell from './NotificationBell';
 
 interface LayoutProps {
   user: User;
@@ -40,7 +39,6 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, sidebarItems,
         user={user}
         toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onProfileClick={onProfileClick}
-        extraActions={<NotificationBell />}
       />
       <div className="flex">
         <Sidebar
