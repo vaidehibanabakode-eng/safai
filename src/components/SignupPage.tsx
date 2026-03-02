@@ -145,6 +145,10 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 });
             }
 
+            // Sign out so the user is redirected to login cleanly.
+            // When they log in again, the Firestore profile is ready and they go
+            // directly to their role-specific dashboard (no ProfileSetupPage).
+            await signOut(auth);
             onSignupSuccess(user.email || 'Google User');
         } catch (err: any) {
             console.error('Google Signup Error:', err);
