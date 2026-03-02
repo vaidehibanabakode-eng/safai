@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { requestAndSaveFCMToken } from '../lib/fcm';
 
@@ -81,16 +81,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const docRef = doc(db, 'users', user.uid);
                 unsubscribeProfile = onSnapshot(docRef,
                     (docSnap: any) => {
-                        // ── No Firestore document → profile setup needed ─────────────
+                        // ── No Firestore document → auto-create a default Citizen profile ─
                         if (!docSnap.exists()) {
-                            setUserProfile({
+                            // Silently create the profile; the next onSnapshot event will load it.
+                            setDoc(docRef, {
                                 uid: user.uid,
                                 email: user.email || '',
-                                name: user.displayName || '',
-                                role: '',
-                            });
-                            setProfileIncomplete(true);
-                            setLoading(false);
+                                name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
+                                role: 'Citizen',
+                                createdAt: serverTimestamp(),
+                                rewardPoints: 0,
+                            }).catch((err: unknown) =>
+                                console.error('[AuthContext] Auto-create profile failed:', err)
+                            );
+                            // Keep loading=true — the next onSnapshot event will resolve everything
                             return;
                         }
 
@@ -119,17 +123,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         setProfileIncomplete(false);
                         setLoading(false);
                     },
-                    (error: any) => {
+                    (error: unknown) => {
                         console.error("[AuthContext] Firestore profile read error:", error);
-                        // Permission error or network issue — send to profile setup,
-                        // NOT silently to CitizenDashboard
+                        // Treat as a fresh user — set a minimal Citizen profile so the app loads
                         setUserProfile({
                             uid: user.uid,
                             email: user.email || '',
-                            name: user.displayName || 'User',
-                            role: '',
+                            name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
+                            role: 'Citizen',
                         });
-                        setProfileIncomplete(true);
+                        setProfileIncomplete(false);
                         setLoading(false);
                     }
                 );
