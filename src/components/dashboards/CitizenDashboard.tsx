@@ -38,6 +38,7 @@ import { User } from '../../App';
 import StatCard from '../common/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useSpeechToText } from '../../hooks/useSpeechToText';
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB — guard against storage/retry-limit-exceeded on mobile
 
 
 interface CitizenDashboardProps {
@@ -421,6 +422,12 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       // The schema currently supports a single imageUrl, so we take the first.
       if (photos.length > 0 && photos[0].file) {
         const file = photos[0].file;
+        // Guard against large files that cause storage/retry-limit-exceeded on mobile
+        if (file.size > MAX_PHOTO_BYTES) {
+          toastError('Photo too large — please use a photo under 5 MB.');
+          setIsSubmitting(false);
+          return;
+        }
         const fileRef = ref(storage, `complaints/${user.id}_${Date.now()}_${file.name}`);
         await uploadBytes(fileRef, file);
         imageUrl = await getDownloadURL(fileRef);
@@ -455,8 +462,14 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       setTimeout(() => setSubmitSuccess(''), 4000);
 
     } catch (err: any) {
-      console.error("Error submitting complaint:", err);
-      setSubmitError(err.message || 'Failed to submit complaint. Please try again.');
+      console.error('Submission error:', err);
+      if (err?.code === 'storage/retry-limit-exceeded') {
+        toastError('Photo upload failed: poor connection. Try a smaller photo or a stronger signal.');
+      } else if (err?.code === 'storage/unauthorized') {
+        toastError('Photo upload not permitted. Please contact support.');
+      } else {
+        toastError('Failed to submit. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
