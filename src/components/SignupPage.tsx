@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { UserPlus, ArrowLeft, CheckCircle } from 'lucide-react';
 import { UserRole } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 
@@ -68,7 +68,10 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 }
             });
 
-            // 4. Notify success only after Firestore write completes
+            // 4. Sign out so there is no race between onAuthStateChanged and setDoc.
+            //    The Firestore profile now exists; when the user logs in fresh they go
+            //    straight to their dashboard without hitting ProfileSetupPage.
+            await signOut(auth);
             onSignupSuccess(email);
         } catch (err: any) {
             console.error('🔥 Detailed Signup Error:', err);
