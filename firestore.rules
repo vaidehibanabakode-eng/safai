@@ -45,7 +45,9 @@ service cloud.firestore {
     match /complaints/{complaintId} {
       allow read:   if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      // Citizens update their own; workers/admins update any (status, assignment)
+      allow update: if isAuthenticated() &&
+                       (resource.data.citizenId == request.auth.uid || isWorker());
       allow delete: if isAdmin();
     }
 
@@ -53,7 +55,8 @@ service cloud.firestore {
     match /assignments/{assignmentId} {
       allow read:   if isAuthenticated();
       allow create: if isAdmin();
-      allow update: if isAuthenticated();
+      // Workers update their own assignment status; admins update any
+      allow update: if isWorker();
       allow delete: if isAdmin();
     }
 
@@ -70,7 +73,10 @@ service cloud.firestore {
     match /ratings/{ratingId} {
       allow read:   if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      // Only the rating's creator or an admin can modify/delete
+      allow update: if isAuthenticated() &&
+                       (resource.data.citizenId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
     }
 
     // ── `inventory` collection ────────────────────────────────────────────────
@@ -108,7 +114,9 @@ service cloud.firestore {
     // ── `salary_records` collection ───────────────────────────────────────────
     // Written by admins; workers can read their own record; admins can read all
     match /salary_records/{recordId} {
-      allow read:   if isAuthenticated();
+      // Workers read their own salary record; admins read all
+      allow read:   if isAuthenticated() &&
+                       (resource.data.workerId == request.auth.uid || isAdmin());
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isSuperadmin();
