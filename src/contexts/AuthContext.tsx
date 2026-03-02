@@ -28,7 +28,6 @@ interface AuthContextType {
     currentUser: FirebaseUser | null;
     userProfile: UserProfile | null;
     loading: boolean;
-    profileIncomplete: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,7 +55,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [profileIncomplete, setProfileIncomplete] = useState(false);
 
     useEffect(() => {
         let unsubscribeProfile: (() => void) | null = null;
@@ -100,7 +98,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                     name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
                                     role: 'Citizen',
                                 });
-                                setProfileIncomplete(false);
                                 setLoading(false);
                             });
                             // Keep loading=true — the next onSnapshot event will resolve everything
@@ -129,7 +126,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             memberSince: firestoreData?.memberSince,
                             preferences: firestoreData?.preferences
                         });
-                        setProfileIncomplete(false);
                         setLoading(false);
                     },
                     (error: unknown) => {
@@ -141,13 +137,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
                             role: 'Citizen',
                         });
-                        setProfileIncomplete(false);
                         setLoading(false);
                     }
                 );
             } else {
                 setUserProfile(null);
-                setProfileIncomplete(false);
                 setLoading(false);
             }
         });
@@ -162,7 +156,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         userProfile,
         loading,
-        profileIncomplete,
     };
 
     return (
