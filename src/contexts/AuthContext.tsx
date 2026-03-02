@@ -91,9 +91,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 role: 'Citizen',
                                 createdAt: serverTimestamp(),
                                 rewardPoints: 0,
-                            }).catch((err: unknown) =>
-                                console.error('[AuthContext] Auto-create profile failed:', err)
-                            );
+                            }).catch((err: unknown) => {
+                                console.error('[AuthContext] Auto-create profile failed:', err);
+                                // Fallback: show a minimal Citizen profile so the app doesn't hang
+                                setUserProfile({
+                                    uid: user.uid,
+                                    email: user.email || '',
+                                    name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
+                                    role: 'Citizen',
+                                });
+                                setProfileIncomplete(false);
+                                setLoading(false);
+                            });
                             // Keep loading=true — the next onSnapshot event will resolve everything
                             return;
                         }
