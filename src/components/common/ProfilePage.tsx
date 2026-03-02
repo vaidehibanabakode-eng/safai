@@ -25,7 +25,8 @@ import { User } from '../../App';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { db, auth } from '../../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 interface ProfilePageProps {
     user: User;
@@ -67,6 +68,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
     const [saved, setSaved] = useState(false);
     const [memberSince, setMemberSince] = useState<string>('—');
     const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
+    const [sendingReset, setSendingReset] = useState(false);
+    const [resetSent, setResetSent] = useState(false);
 
     const [form, setForm] = useState({
         name: user.name,
@@ -187,6 +190,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
             toastError('Failed to elevate account. You might not have sufficient permissions.');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        if (!user.email) return;
+        setSendingReset(true);
+        try {
+            await sendPasswordResetEmail(auth, user.email);
+            setResetSent(true);
+            toastSuccess(`Password reset email sent to ${user.email}`);
+            setTimeout(() => setResetSent(false), 5000);
+        } catch (err: any) {
+            console.error('Password reset error:', err);
+            toastError('Failed to send password reset email. Please try again.');
+        } finally {
+            setSendingReset(false);
         }
     };
 
@@ -491,9 +510,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                    <button className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors">
-                        <Lock className="w-4 h-4" />
-                        {t('change_password')}
+                    <button
+                        onClick={handleChangePassword}
+                        disabled={sendingReset || resetSent}
+                        className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {sendingReset ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Lock className="w-4 h-4" />
+                        )}
+                        {resetSent ? 'Reset email sent ✓' : t('change_password')}
                     </button>
                     <button className="flex items-center gap-2 px-5 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors">
                         <Shield className="w-4 h-4" />
