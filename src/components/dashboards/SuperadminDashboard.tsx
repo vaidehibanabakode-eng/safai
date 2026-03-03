@@ -8,6 +8,7 @@ import {
   Settings,
   UserCircle,
   Map as MapIcon,
+  Upload,
 } from 'lucide-react';
 import { User } from '../../App';
 import Layout from '../common/Layout';
@@ -20,6 +21,7 @@ import SettingsTab from './tabs/SettingsTab';
 import ProfilePage from '../common/ProfilePage';
 import { useLanguage } from '../../contexts/LanguageContext';
 import HeatmapTab from './HeatmapTab';
+import TrainingUploadTab from './tabs/TrainingUploadTab';
 
 interface SuperadminDashboardProps {
   user: User;
@@ -34,6 +36,7 @@ const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, onLogou
     { icon: <BarChart3 className="w-5 h-5" />, label: t('overview'), active: activeTab === 'overview', onClick: () => setActiveTab('overview') },
     { icon: <Users className="w-5 h-5" />, label: t('admin_management'), active: activeTab === 'admins', onClick: () => setActiveTab('admins') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
+    { icon: <Upload className="w-5 h-5" />, label: 'Upload Training', active: activeTab === 'training_upload', onClick: () => setActiveTab('training_upload') },
     { icon: <FileText className="w-5 h-5" />, label: t('reports'), active: activeTab === 'reports', onClick: () => setActiveTab('reports') },
     { icon: <MapIcon className="w-5 h-5" />, label: 'Heatmap', active: activeTab === 'heatmap', onClick: () => setActiveTab('heatmap') },
     { icon: <Package className="w-5 h-5" />, label: t('inventory_management'), active: activeTab === 'inventory', onClick: () => setActiveTab('inventory') },
@@ -46,6 +49,7 @@ const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, onLogou
       case 'overview':   return <OverviewTab />;
       case 'admins':     return <AdminManagementTab />;
       case 'training':   return <TrainingSystem user={user} />;
+      case 'training_upload': return <TrainingUploadTab user={user} />;
       case 'reports':    return <ReportsTab />;
       case 'heatmap':    return <HeatmapTab />;
       case 'inventory':  return <InventoryTab />;

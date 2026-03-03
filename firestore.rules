@@ -154,5 +154,13 @@ service cloud.firestore {
                        (isAuthenticated() && resource.data.email == request.auth.token.email);
     }
 
+    // ── `training_materials` collection ──────────────────────────────────────
+    // Superadmins upload materials; all authenticated users can read
+    match /training_materials/{materialId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSuperadmin();
+      allow delete: if isSuperadmin();
+    }
+
   }
 }
