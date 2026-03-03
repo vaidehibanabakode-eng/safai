@@ -132,10 +132,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
     }, [user.id]);
 
     const handleSave = async () => {
+        if (!form.name.trim()) {
+            toastError('Name cannot be empty.');
+            return;
+        }
         setIsSaving(true);
         try {
             const data: Record<string, any> = {
-                name: form.name.trim() || form.name,
+                name: form.name.trim(),
                 phone: form.phone,
                 address: form.address,
                 ...(form.zone ? { assignedZone: form.zone } : {}),
