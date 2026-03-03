@@ -155,6 +155,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         const rawRole = String(firestoreData?.role || '').toLowerCase();
                         const resolvedRole = ROLE_NORMALIZATION[rawRole] || 'Citizen';
 
+                        // Dev-mode visibility: log role resolution so routing bugs are obvious
+                        if (import.meta.env.DEV) {
+                            console.log(
+                                `[AuthContext] uid=${user.uid} | firestoreRole="${firestoreData?.role}" ` +
+                                `→ rawRole="${rawRole}" → resolvedRole="${resolvedRole}"`
+                            );
+                        }
+
                         setUserProfile({
                             uid: user.uid,
                             email: user.email || '',
