@@ -367,5 +367,7 @@
     "zone_label": "Zone",
     "valid_through": "Valid Through",
     "qr_scan_label": "Scan to verify identity",
-    "id_card_footer": "SafaiConnect — Empowering Sanitation Workers"
+    "id_card_footer": "SafaiConnect — Empowering Sanitation Workers",
+    "salary": "Salary",
+    "upload_training": "Upload Training"
 }

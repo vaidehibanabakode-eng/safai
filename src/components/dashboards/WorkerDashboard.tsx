@@ -280,7 +280,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
     { icon: <Camera className="w-5 h-5" />, label: t('submit_proof'), active: activeTab === 'proof', onClick: () => setActiveTab('proof') },
     { icon: <CheckCircle className="w-5 h-5" />, label: t('attendance'), active: activeTab === 'attendance', onClick: () => setActiveTab('attendance') },
     { icon: <QrCode className="w-5 h-5" />, label: t('digital_id'), active: activeTab === 'digitalid', onClick: () => setActiveTab('digitalid') },
-    { icon: <DollarSign className="w-5 h-5" />, label: 'Salary', active: activeTab === 'salary', onClick: () => setActiveTab('salary') },
+    { icon: <DollarSign className="w-5 h-5" />, label: t('salary'), active: activeTab === 'salary', onClick: () => setActiveTab('salary') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <Settings className="w-5 h-5" />, label: t('settings'), active: activeTab === 'settings', onClick: () => setActiveTab('settings') },
     { icon: <UserCircle className="w-5 h-5" />, label: t('profile'), active: activeTab === 'profile', onClick: () => setActiveTab('profile') },

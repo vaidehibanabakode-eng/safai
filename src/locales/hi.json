@@ -367,5 +367,7 @@
     "zone_label": "ज़ोन",
     "valid_through": "वैध तक",
     "qr_scan_label": "पहचान सत्यापित करने के लिए स्कैन करें",
-    "id_card_footer": "SafaiConnect — सफाई कर्मचारियों को सशक्त बनाना"
+    "id_card_footer": "SafaiConnect — सफाई कर्मचारियों को सशक्त बनाना",
+    "salary": "वेतन",
+    "upload_training": "प्रशिक्षण अपलोड"
 }

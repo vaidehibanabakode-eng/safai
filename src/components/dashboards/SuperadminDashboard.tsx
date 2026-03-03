@@ -36,7 +36,7 @@ const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, onLogou
     { icon: <BarChart3 className="w-5 h-5" />, label: t('overview'), active: activeTab === 'overview', onClick: () => setActiveTab('overview') },
     { icon: <Users className="w-5 h-5" />, label: t('admin_management'), active: activeTab === 'admins', onClick: () => setActiveTab('admins') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
-    { icon: <Upload className="w-5 h-5" />, label: 'Upload Training', active: activeTab === 'training_upload', onClick: () => setActiveTab('training_upload') },
+    { icon: <Upload className="w-5 h-5" />, label: t('upload_training'), active: activeTab === 'training_upload', onClick: () => setActiveTab('training_upload') },
     { icon: <FileText className="w-5 h-5" />, label: t('reports'), active: activeTab === 'reports', onClick: () => setActiveTab('reports') },
     { icon: <MapIcon className="w-5 h-5" />, label: 'Heatmap', active: activeTab === 'heatmap', onClick: () => setActiveTab('heatmap') },
     { icon: <Package className="w-5 h-5" />, label: t('inventory_management'), active: activeTab === 'inventory', onClick: () => setActiveTab('inventory') },
