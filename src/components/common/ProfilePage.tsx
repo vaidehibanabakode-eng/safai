@@ -135,10 +135,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
         setIsSaving(true);
         try {
             const data: Record<string, any> = {
-                name: form.name,
+                name: form.name.trim() || form.name,
                 phone: form.phone,
                 address: form.address,
-                assignedZone: form.zone,
+                ...(form.zone ? { assignedZone: form.zone } : {}),
             };
             if (user.role === 'superadmin') {
                 Object.assign(data, {
@@ -158,6 +158,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
             } else if (user.role === 'worker') {
                 Object.assign(data, {
                     workerType: form.workerType,
+                    designation: form.designation,
                 });
             } else if (user.role === 'citizen') {
                 Object.assign(data, { ward: form.ward });
