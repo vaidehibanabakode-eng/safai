@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, ArrowLeft, CheckCircle } from 'lucide-react';
 import { UserRole } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 
@@ -11,6 +11,14 @@ interface SignupPageProps {
     onNavigateToLogin: () => void;
 }
 
+const ROLE_MAP: Record<string, string> = {
+    worker: 'Worker',
+    citizen: 'Citizen',
+    admin: 'Admin',
+    superadmin: 'Superadmin',
+    'green-champion': 'Green-Champion',
+};
+
 const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLogin }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -18,6 +26,50 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
     const [role, setRole] = useState<UserRole | ''>('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Handle the result when Google redirects back after signup
+    useEffect(() => {
+        getRedirectResult(auth)
+            .then(async (result) => {
+                if (!result?.user) return;
+                const user = result.user;
+                const pendingRole = sessionStorage.getItem('pendingGoogleSignupRole') || 'citizen';
+                sessionStorage.removeItem('pendingGoogleSignupRole');
+                const firestoreRole = ROLE_MAP[pendingRole] || 'Citizen';
+                setIsLoading(true);
+                try {
+                    const docRef = doc(db, 'users', user.uid);
+                    const docSnap = await getDoc(docRef);
+                    if (!docSnap.exists()) {
+                        await setDoc(docRef, {
+                            uid: user.uid,
+                            email: user.email,
+                            name: user.displayName || 'Google User',
+                            role: firestoreRole,
+                            createdAt: serverTimestamp(),
+                            rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
+                            phone: '',
+                            address: '',
+                            citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+                            assignedZone: '',
+                            memberSince: serverTimestamp(),
+                            preferences: { notifications: true, language: 'en' },
+                        });
+                    }
+                    await signOut(auth);
+                    onSignupSuccess(user.email || 'Google User');
+                } finally {
+                    setIsLoading(false);
+                }
+            })
+            .catch((err: any) => {
+                if (err.code && err.code !== 'auth/no-current-user') {
+                    console.error('Google Signup Redirect Error:', err);
+                    setError(`Google sign-up failed (${err.code}). Please try again.`);
+                    sessionStorage.removeItem('pendingGoogleSignupRole');
+                }
+            });
+    }, []);
     const { t } = useLanguage();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -104,56 +156,17 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             setError('Please select a role before signing up.');
             return;
         }
-
         setError('');
         setIsLoading(true);
         try {
-            const userCredential = await signInWithPopup(auth, googleProvider);
-            const user = userCredential.user;
-
-            const roleMap: Record<string, string> = {
-                worker: 'Worker',
-                citizen: 'Citizen',
-                admin: 'Admin',
-                superadmin: 'Superadmin',
-                'green-champion': 'Green-Champion'
-            };
-            const firestoreRole = roleMap[role] || 'Citizen';
-
-            // Check if user already exists in Firestore
-            const docRef = doc(db, 'users', user.uid);
-            const docSnap = await getDoc(docRef);
-
-            if (!docSnap.exists()) {
-                // First time Google Sign in - assign SELECTED role (not always Citizen)
-                await setDoc(docRef, {
-                    uid: user.uid,
-                    email: user.email,
-                    name: user.displayName || 'Google User',
-                    role: firestoreRole,
-                    createdAt: serverTimestamp(),
-                    rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
-                    phone: '',
-                    address: '',
-                    citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
-                    assignedZone: '',
-                    memberSince: serverTimestamp(),
-                    preferences: {
-                        notifications: true,
-                        language: 'en'
-                    }
-                });
-            }
-
-            // Sign out so the user is redirected to login cleanly.
-            // When they log in again, the Firestore profile is ready and they go
-            // directly to their role-specific dashboard (no ProfileSetupPage).
-            await signOut(auth);
-            onSignupSuccess(user.email || 'Google User');
+            // Store selected role so the post-redirect useEffect can read it
+            sessionStorage.setItem('pendingGoogleSignupRole', role);
+            await signInWithRedirect(auth, googleProvider);
+            // Page navigates away — code below does not run
         } catch (err: any) {
             console.error('Google Signup Error:', err);
-            setError('Failed to sign up with Google. Please try again.');
-        } finally {
+            setError(`Google sign-up failed (${err.code || 'unknown'}). Please try again.`);
+            sessionStorage.removeItem('pendingGoogleSignupRole');
             setIsLoading(false);
         }
     };

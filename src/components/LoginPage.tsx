@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LogIn, ArrowLeft, ShieldCheck, Mail, Lock, Zap } from 'lucide-react';
 import { User } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import LanguageSwitcher from './common/LanguageSwitcher';
 
@@ -18,6 +18,28 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useLanguage();
+
+  // Handle the result when Google redirects back to the app
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          // AuthContext onAuthStateChanged handles profile loading automatically
+          onLogin({
+            id: result.user.uid,
+            email: result.user.email || '',
+            name: result.user.displayName || 'User',
+            role: 'citizen',
+          });
+        }
+      })
+      .catch((err: any) => {
+        if (err.code && err.code !== 'auth/no-current-user') {
+          console.error('Google Redirect Result Error:', err);
+          setError(`Google sign-in failed (${err.code}). Please try again.`);
+        }
+      });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,21 +75,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
     setError('');
     setIsLoading(true);
     try {
-      const userCredential = await signInWithPopup(auth, googleProvider);
-      // AuthContext's onAuthStateChanged fires automatically.
-      // If the Firestore doc exists → reads the real role → correct dashboard.
-      // If no Firestore doc → profileIncomplete = true → ProfileSetupPage shown.
-      // We do NOT create a Citizen doc here — that was overwriting real roles.
-      onLogin({
-        id: userCredential.user.uid,
-        email: userCredential.user.email || '',
-        name: userCredential.user.displayName || 'User',
-        role: 'citizen'
-      });
+      // signInWithRedirect is more reliable than signInWithPopup for PWA/mobile.
+      // The result is handled in the useEffect above via getRedirectResult.
+      await signInWithRedirect(auth, googleProvider);
+      // Page navigates away — code below does not run
     } catch (err: any) {
       console.error('Google Login Error:', err);
-      setError('Failed to log in with Google. Please try again.');
-    } finally {
+      setError(`Google sign-in failed (${err.code || 'unknown'}). Please try again.`);
       setIsLoading(false);
     }
   };
