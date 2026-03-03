@@ -26,7 +26,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { sendPasswordResetEmail, updateProfile } from 'firebase/auth';
 
 interface ProfilePageProps {
     user: User;
@@ -138,6 +138,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
                 name: form.name,
                 phone: form.phone,
                 address: form.address,
+                assignedZone: form.zone,
             };
             if (user.role === 'superadmin') {
                 Object.assign(data, {
@@ -157,12 +158,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
             } else if (user.role === 'worker') {
                 Object.assign(data, {
                     workerType: form.workerType,
-                    designation: form.designation,
                 });
             } else if (user.role === 'citizen') {
                 Object.assign(data, { ward: form.ward });
             }
             await updateDoc(doc(db, 'users', user.id), data);
+            // Sync display name to Firebase Auth profile
+            if (auth.currentUser && form.name.trim()) {
+                try {
+                    await updateProfile(auth.currentUser, { displayName: form.name.trim() });
+                } catch (err) {
+                    console.warn('updateProfile failed (non-critical):', err);
+                }
+            }
             setIsEditing(false);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
