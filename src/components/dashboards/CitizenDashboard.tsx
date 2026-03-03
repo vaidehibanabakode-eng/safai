@@ -40,6 +40,25 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useSpeechToText } from '../../hooks/useSpeechToText';
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB — guard against storage/retry-limit-exceeded on mobile
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+const uploadWithRetry = async (
+  fileRef: ReturnType<typeof ref>,
+  file: File,
+  maxAttempts = 3
+): Promise<string> => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await uploadBytes(fileRef, file);
+      return await getDownloadURL(fileRef);
+    } catch (err: any) {
+      if (attempt === maxAttempts) throw err;
+      await sleep(2000 * attempt); // 2s, 4s backoff
+    }
+  }
+  throw new Error('Upload failed after retries');
+};
+
 
 interface CitizenDashboardProps {
   user: User;
@@ -429,8 +448,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
           return;
         }
         const fileRef = ref(storage, `complaints/${user.id}_${Date.now()}_${file.name}`);
-        await uploadBytes(fileRef, file);
-        imageUrl = await getDownloadURL(fileRef);
+        imageUrl = await uploadWithRetry(fileRef, file);
       }
 
       const complaintData = {
