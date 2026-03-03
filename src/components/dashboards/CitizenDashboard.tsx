@@ -112,10 +112,19 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     (transcript) => setDescription((prev) => prev ? `${prev} ${transcript}` : transcript),
   );
 
-  // AI category suggestion
+  // AI category suggestion (text-based)
   const aiDismissedForRef = React.useRef<string>('');
   const [aiSuggestion, setAiSuggestion] = useState<{ category: string; confidence: number } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+
+  // AI photo analysis (vision-based)
+  const [photoAiSuggestion, setPhotoAiSuggestion] = useState<{
+    category: string;
+    severity: string;
+    description: string;
+    confidence: number;
+  } | null>(null);
+  const [photoAiLoading, setPhotoAiLoading] = useState(false);
 
   interface Complaint {
     id: string;
@@ -338,14 +347,43 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     setPhotos((prev) => [...prev, ...toAdd]);
     // Capture GPS for each new photo
     toAdd.forEach((_, i) => captureGpsForPhoto(startIndex + i));
+    // Analyse first photo with AI vision when it's the first one added
+    if (photos.length === 0 && toAdd.length > 0) {
+      analyzePhotoWithAI(toAdd[0].file);
+    }
     e.target.value = '';
   };
 
   const removePhoto = (index: number) => {
     setPhotos((prev) => {
       URL.revokeObjectURL(prev[index].preview);
-      return prev.filter((_, i) => i !== index);
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) setPhotoAiSuggestion(null);
+      return next;
     });
+  };
+
+  const analyzePhotoWithAI = async (file: File) => {
+    setPhotoAiLoading(true);
+    setPhotoAiSuggestion(null);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch('/api/analyze-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, mimeType: file.type || 'image/jpeg' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPhotoAiSuggestion(data);
+      }
+    } catch { /* fail silently — AI is non-blocking */ }
+    setPhotoAiLoading(false);
   };
 
   // ----------- GPS location state -----------
@@ -803,6 +841,55 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                           ) : null}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Photo AI analysis result */}
+                  {(photoAiLoading || photoAiSuggestion) && (
+                    <div className="mt-2 mb-3">
+                      {photoAiLoading && (
+                        <span className="flex items-center gap-1.5 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-3 py-1 w-fit">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          AI analysing photo...
+                        </span>
+                      )}
+                      {photoAiSuggestion && !photoAiLoading && (
+                        <div className="flex items-start gap-2 flex-wrap p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-orange-700 mb-0.5">📸 AI Photo Analysis</p>
+                            <p className="text-xs text-orange-800">
+                              <span className="font-medium">{photoAiSuggestion.category}</span>
+                              {' · '}
+                              <span className={`font-medium ${photoAiSuggestion.severity === 'high' ? 'text-red-600' : photoAiSuggestion.severity === 'medium' ? 'text-yellow-600' : 'text-green-600'}`}>
+                                {photoAiSuggestion.severity} severity
+                              </span>
+                              {' · '}
+                              {Math.round(photoAiSuggestion.confidence * 100)}% confident
+                            </p>
+                            <p className="text-xs text-gray-600 mt-0.5 italic">"{photoAiSuggestion.description}"</p>
+                          </div>
+                          <div className="flex gap-1.5 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIssueType(photoAiSuggestion.category);
+                                if (!description.trim()) setDescription(photoAiSuggestion.description);
+                                setPhotoAiSuggestion(null);
+                              }}
+                              className="text-xs bg-orange-600 text-white rounded-full px-3 py-1 hover:bg-orange-700 transition-colors"
+                            >
+                              Apply
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPhotoAiSuggestion(null)}
+                              className="text-xs text-gray-500 hover:text-gray-700 rounded-full px-2 py-1"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
