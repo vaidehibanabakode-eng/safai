@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 interface Admin {
@@ -151,11 +151,36 @@ const AdminManagementTab: React.FC = () => {
         setSaving(false);
       }
     } else {
-      // ── New admin: cannot create Firebase Auth from client ─────────────────
-      // Show the instructions panel instead of creating an account
-      setShowAddModal(false);
-      setShowAddModal(true);   // keep the modal open in "instructions" state
-      setIsEditing('__new_instructions__');
+      // ── New admin: pre-create Firestore invitation record ─────────────────
+      if (!formData.email.trim()) {
+        showToast(t('alert_fill_required') || 'Email address is required.', false);
+        return;
+      }
+      setSaving(true);
+      try {
+        // Use a sanitized email as the document ID so it's queryable
+        const emailKey = formData.email.trim().toLowerCase()
+          .replace(/\./g, '_')
+          .replace(/@/g, '__at__');
+        await setDoc(doc(db, 'pending_admins', emailKey), {
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          role: 'Admin',
+          assignedZone: formData.area,
+          adminLevel: formData.role,
+          status: 'Active',
+          createdAt: serverTimestamp(),
+        });
+        showToast(
+          `Admin invitation created! Ask ${formData.email} to sign up at the app — they will automatically get Admin access.`
+        );
+        setShowAddModal(false);
+        setFormData({ name: '', email: '', area: 'Zone A', role: 'Zone Admin', password: '', status: 'Active' });
+      } catch (err: any) {
+        showToast(err.message || 'Failed to create admin invitation.', false);
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -356,37 +381,24 @@ const AdminManagementTab: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="text-lg font-bold text-gray-900">{isEditing && isEditing !== '__new_instructions__' ? t('modal_edit_title') : t('modal_add_title')}</h3>
+              <h3 className="text-lg font-bold text-gray-900">{isEditing ? t('modal_edit_title') : t('modal_add_title')}</h3>
               <button onClick={() => { setShowAddModal(false); setIsEditing(null); }} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* ── New admin: show instructions ──────────────────────────── */}
-            {(!isEditing || isEditing === '__new_instructions__') ? (
-              <div className="p-6 space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                  <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-blue-800">
-                    <p className="font-semibold mb-1">How to onboard a new Admin</p>
-                    <ol className="list-decimal list-inside space-y-1 text-blue-700">
-                      <li>Have them create an account via the <strong>Sign Up</strong> page</li>
-                      <li>Once registered, find them in the <strong>Users</strong> list in Firebase Console</li>
-                      <li>Set their Firestore <code className="bg-blue-100 px-1 rounded">role</code> field to <code className="bg-blue-100 px-1 rounded">Admin</code></li>
-                      <li>They will appear here automatically and can be assigned a zone</li>
-                    </ol>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 text-center">Direct account creation requires server-side Firebase Admin SDK for security reasons.</p>
-                <div className="flex justify-end">
-                  <button onClick={() => { setShowAddModal(false); setIsEditing(null); }} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors">
-                    Got it
-                  </button>
+            {/* ── Add new admin: show invitation info banner ─────────────── */}
+            {!isEditing && (
+              <div className="px-6 pt-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex gap-3">
+                  <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-700">Fill in the details below. An invitation will be created — when this person signs up with their email they will automatically receive Admin access.</p>
                 </div>
               </div>
-            ) : (
-              /* ── Edit existing admin ──────────────────────────────────── */
-              <>
+            )}
+
+            {/* ── Add / Edit form ────────────────────────────────────────── */}
+            <>
                 <div className="p-6 space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium text-gray-700">{t('label_full_name')}</label>
@@ -404,10 +416,12 @@ const AdminManagementTab: React.FC = () => {
                     <input
                       type="email"
                       value={formData.email}
-                      disabled
-                      className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+                      disabled={!!isEditing}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className={`w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all ${isEditing ? 'bg-gray-50 text-gray-400 cursor-not-allowed' : ''}`}
+                      placeholder="admin@example.com"
                     />
-                    <p className="text-xs text-gray-400">Email cannot be changed here — update via Firebase Console.</p>
+                    {isEditing && <p className="text-xs text-gray-400">Email cannot be changed here — update via Firebase Console.</p>}
                   </div>
 
                   <div className="space-y-1.5">
@@ -486,7 +500,6 @@ const AdminManagementTab: React.FC = () => {
                   </button>
                 </div>
               </>
-            )}
           </div>
         </div>
       )}

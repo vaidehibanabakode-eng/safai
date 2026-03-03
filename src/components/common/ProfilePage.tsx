@@ -26,7 +26,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { sendPasswordResetEmail, updateProfile } from 'firebase/auth';
 
 interface ProfilePageProps {
     user: User;
@@ -132,12 +132,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
     }, [user.id]);
 
     const handleSave = async () => {
+        if (!form.name.trim()) {
+            toastError('Name cannot be empty.');
+            return;
+        }
         setIsSaving(true);
         try {
             const data: Record<string, any> = {
-                name: form.name,
+                name: form.name.trim(),
                 phone: form.phone,
                 address: form.address,
+                ...(form.zone ? { assignedZone: form.zone } : {}),
             };
             if (user.role === 'superadmin') {
                 Object.assign(data, {
@@ -163,6 +168,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
                 Object.assign(data, { ward: form.ward });
             }
             await updateDoc(doc(db, 'users', user.id), data);
+            // Sync display name to Firebase Auth profile
+            if (auth.currentUser && form.name.trim()) {
+                try {
+                    await updateProfile(auth.currentUser, { displayName: form.name.trim() });
+                } catch (err) {
+                    console.warn('updateProfile failed (non-critical):', err);
+                }
+            }
             setIsEditing(false);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
