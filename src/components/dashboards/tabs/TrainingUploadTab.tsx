@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Video, Download, Loader2, Trash2 } from 'lucide-react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db, storage } from '../../../lib/firebase';
 import { User } from '../../../App';
 import { useToast } from '../../../contexts/ToastContext';
@@ -12,9 +12,10 @@ interface TrainingMaterial {
   fileUrl: string;
   type: 'pdf' | 'video' | 'other';
   uploadedBy: string;
-  createdAt: any;
+  createdAt: Timestamp | null;
   fileName?: string;
   fileSize?: number;
+  storagePath?: string;
 }
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -31,6 +32,7 @@ const TrainingUploadTab: React.FC<TrainingUploadTabProps> = ({ user }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [title, setTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -38,7 +40,10 @@ const TrainingUploadTab: React.FC<TrainingUploadTabProps> = ({ user }) => {
     const unsub = onSnapshot(q, (snap) => {
       setMaterials(snap.docs.map((d) => ({ id: d.id, ...d.data() } as TrainingMaterial)));
       setLoadingMaterials(false);
-    }, () => setLoadingMaterials(false));
+    }, () => {
+      setLoadingMaterials(false);
+      toastError('Failed to load training materials.');
+    });
     return () => unsub();
   }, []);
 
@@ -91,6 +96,7 @@ const TrainingUploadTab: React.FC<TrainingUploadTabProps> = ({ user }) => {
               uploadedById: user.id,
               fileName: selectedFile.name,
               fileSize: selectedFile.size,
+              storagePath: `training-materials/${safeFileName}`,
               createdAt: serverTimestamp(),
             });
             resolve();
@@ -112,17 +118,22 @@ const TrainingUploadTab: React.FC<TrainingUploadTabProps> = ({ user }) => {
   };
 
   const handleDelete = async (material: TrainingMaterial) => {
-    if (!window.confirm(`Delete "${material.title}"?`)) return;
     try {
+      if (material.storagePath) {
+        const storageRef = ref(storage, material.storagePath);
+        await deleteObject(storageRef);
+      }
       await deleteDoc(doc(db, 'training_materials', material.id));
       toastSuccess('Material deleted.');
     } catch (err: any) {
       toastError(err?.message || 'Failed to delete.');
+    } finally {
+      setConfirmDeleteId(null);
     }
   };
 
   const formatBytes = (bytes?: number) => {
-    if (!bytes) return '';
+    if (bytes === undefined || bytes === null) return '';
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
@@ -238,13 +249,30 @@ const TrainingUploadTab: React.FC<TrainingUploadTabProps> = ({ user }) => {
                   >
                     <Download className="w-5 h-5" />
                   </a>
-                  <button
-                    onClick={() => handleDelete(m)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  {confirmDeleteId === m.id ? (
+                    <>
+                      <button
+                        onClick={() => handleDelete(m)}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                      >
+                        Confirm?
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-3 py-1.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(m.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
