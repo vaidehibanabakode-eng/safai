@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { requestAndSaveFCMToken } from '../lib/fcm';
 
@@ -51,6 +51,21 @@ const ROLE_NORMALIZATION: Record<string, string> = {
     'green_champion':'Green-Champion',
 };
 
+// ── Pending admin lookup ──────────────────────────────────────────────────────
+// Returns the pending_admins doc data if a Superadmin pre-created an invite for this email.
+const getPendingAdminData = async (email: string): Promise<Record<string, any> | null> => {
+    const emailKey = email.toLowerCase()
+        .replace(/\./g, '_')
+        .replace(/@/g, '__at__');
+    try {
+        const snap = await getDoc(doc(db, 'pending_admins', emailKey));
+        if (snap.exists()) return snap.data();
+    } catch {
+        // Firestore read failure (e.g. network) — fall through to default Citizen
+    }
+    return null;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -81,25 +96,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     (docSnap: any) => {
                         // ── No Firestore document → auto-create a default Citizen profile ─
                         if (!docSnap.exists()) {
-                            // Silently create the profile; the next onSnapshot event will load it.
-                            setDoc(docRef, {
-                                uid: user.uid,
-                                email: user.email || '',
-                                name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
-                                role: 'Citizen',
-                                createdAt: serverTimestamp(),
-                                rewardPoints: 0,
-                            }).catch((err: unknown) => {
-                                console.error('[AuthContext] Auto-create profile failed:', err);
-                                // Fallback: show a minimal Citizen profile so the app doesn't hang
-                                setUserProfile({
-                                    uid: user.uid,
-                                    email: user.email || '',
-                                    name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
-                                    role: 'Citizen',
-                                });
-                                setLoading(false);
-                            });
+                            // Use async IIFE to allow await inside the sync callback
+                            (async () => {
+                                const email = user.email || '';
+                                // Check if a Superadmin pre-created an admin invitation for this email
+                                const pending = email ? await getPendingAdminData(email) : null;
+
+                                const newProfile: Record<string, any> = pending
+                                    ? {
+                                        uid: user.uid,
+                                        email: email,
+                                        name: pending.name || user.displayName || (email.split('@')[0] ?? 'User'),
+                                        role: pending.role || 'Admin',
+                                        assignedZone: pending.assignedZone || '',
+                                        adminLevel: pending.adminLevel || 'Zone Admin',
+                                        status: pending.status || 'Active',
+                                        createdAt: serverTimestamp(),
+                                    }
+                                    : {
+                                        uid: user.uid,
+                                        email: email,
+                                        name: user.displayName || (email.split('@')[0] ?? 'User'),
+                                        role: 'Citizen',
+                                        createdAt: serverTimestamp(),
+                                        rewardPoints: 0,
+                                        citizenID: `CIT-${user.uid.slice(-6).toUpperCase()}`,
+                                    };
+
+                                setDoc(docRef, newProfile)
+                                    .then(async () => {
+                                        // Clean up the pending_admins record after consuming it
+                                        if (pending && email) {
+                                            const emailKey = email.toLowerCase()
+                                                .replace(/\./g, '_')
+                                                .replace(/@/g, '__at__');
+                                            deleteDoc(doc(db, 'pending_admins', emailKey)).catch(() => {});
+                                        }
+                                    })
+                                    .catch((err: unknown) => {
+                                        console.error('[AuthContext] Auto-create profile failed:', err);
+                                        setUserProfile({
+                                            uid: user.uid,
+                                            email: email,
+                                            name: user.displayName || (email.split('@')[0] ?? 'User'),
+                                            role: 'Citizen',
+                                        });
+                                        setLoading(false);
+                                    });
+                            })();
                             // Keep loading=true — the next onSnapshot event will resolve everything
                             return;
                         }

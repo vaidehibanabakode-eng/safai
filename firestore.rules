@@ -144,5 +144,15 @@ service cloud.firestore {
                        (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // ── `pending_admins` collection ───────────────────────────────────────────
+    // Superadmins create admin invitations; the invited user can read their own pending record
+    match /pending_admins/{docId} {
+      allow read: if isSuperadmin() ||
+                     (isAuthenticated() && resource.data.email == request.auth.token.email);
+      allow create, update: if isSuperadmin();
+      allow delete: if isSuperadmin() ||
+                       (isAuthenticated() && resource.data.email == request.auth.token.email);
+    }
+
   }
 }
