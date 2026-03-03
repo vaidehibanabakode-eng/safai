@@ -47,9 +47,13 @@ const uploadWithRetry = async (
   file: File,
   maxAttempts = 3
 ): Promise<string> => {
+  let uploaded = false;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await uploadBytes(fileRef, file);
+      if (!uploaded) {
+        await uploadBytes(fileRef, file);
+        uploaded = true;
+      }
       return await getDownloadURL(fileRef);
     } catch (err: any) {
       if (attempt === maxAttempts) throw err;
