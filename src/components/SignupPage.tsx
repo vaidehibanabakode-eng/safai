@@ -12,10 +12,8 @@ interface SignupPageProps {
 }
 
 const ROLE_MAP: Record<string, string> = {
-    worker: 'Worker',
     citizen: 'Citizen',
-    admin: 'Admin',
-    superadmin: 'Superadmin',
+    worker: 'Worker',
     'green-champion': 'Green-Champion',
 };
 
