@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { requestAndSaveFCMToken } from '../lib/fcm';
 
@@ -28,7 +28,6 @@ interface AuthContextType {
     currentUser: FirebaseUser | null;
     userProfile: UserProfile | null;
     loading: boolean;
-    profileIncomplete: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,7 +55,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [profileIncomplete, setProfileIncomplete] = useState(false);
 
     useEffect(() => {
         let unsubscribeProfile: (() => void) | null = null;
@@ -81,16 +79,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const docRef = doc(db, 'users', user.uid);
                 unsubscribeProfile = onSnapshot(docRef,
                     (docSnap: any) => {
-                        // ── No Firestore document → profile setup needed ─────────────
+                        // ── No Firestore document → auto-create a default Citizen profile ─
                         if (!docSnap.exists()) {
-                            setUserProfile({
+                            // Silently create the profile; the next onSnapshot event will load it.
+                            setDoc(docRef, {
                                 uid: user.uid,
                                 email: user.email || '',
-                                name: user.displayName || '',
-                                role: '',
+                                name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
+                                role: 'Citizen',
+                                createdAt: serverTimestamp(),
+                                rewardPoints: 0,
+                            }).catch((err: unknown) => {
+                                console.error('[AuthContext] Auto-create profile failed:', err);
+                                // Fallback: show a minimal Citizen profile so the app doesn't hang
+                                setUserProfile({
+                                    uid: user.uid,
+                                    email: user.email || '',
+                                    name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
+                                    role: 'Citizen',
+                                });
+                                setLoading(false);
                             });
-                            setProfileIncomplete(true);
-                            setLoading(false);
+                            // Keep loading=true — the next onSnapshot event will resolve everything
                             return;
                         }
 
@@ -116,26 +126,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             memberSince: firestoreData?.memberSince,
                             preferences: firestoreData?.preferences
                         });
-                        setProfileIncomplete(false);
                         setLoading(false);
                     },
-                    (error: any) => {
+                    (error: unknown) => {
                         console.error("[AuthContext] Firestore profile read error:", error);
-                        // Permission error or network issue — send to profile setup,
-                        // NOT silently to CitizenDashboard
+                        // Treat as a fresh user — set a minimal Citizen profile so the app loads
                         setUserProfile({
                             uid: user.uid,
                             email: user.email || '',
-                            name: user.displayName || 'User',
-                            role: '',
+                            name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
+                            role: 'Citizen',
                         });
-                        setProfileIncomplete(true);
                         setLoading(false);
                     }
                 );
             } else {
                 setUserProfile(null);
-                setProfileIncomplete(false);
                 setLoading(false);
             }
         });
@@ -150,7 +156,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         userProfile,
         loading,
-        profileIncomplete,
     };
 
     return (

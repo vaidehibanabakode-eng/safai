@@ -792,6 +792,26 @@ const AttendanceTab: React.FC<{ workerId: string; workerName: string }> = ({ wor
   const isCheckedIn = !!todayRecord?.checkIn;
   const isCheckedOut = !!todayRecord?.checkOut;
 
+  const MIN_SHIFT_MS = 4 * 60 * 60 * 1000; // 4 hours in ms
+
+  const [now2, setNow2] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow2(Date.now()), 30_000); // refresh every 30s
+    return () => clearInterval(timer);
+  }, []);
+
+  const checkInMs = (todayRecord?.checkInTs as { toMillis?: () => number } | undefined)?.toMillis?.() ?? null;
+  const msElapsed = checkInMs !== null ? now2 - checkInMs : 0;
+  const msRemaining = Math.max(0, MIN_SHIFT_MS - msElapsed);
+  const checkoutUnlocked = !isCheckedIn || isCheckedOut || msElapsed >= MIN_SHIFT_MS;
+
+  const formatRemaining = (ms: number): string => {
+    const totalMinutes = Math.ceil(ms / 60_000);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -891,11 +911,21 @@ const AttendanceTab: React.FC<{ workerId: string; workerName: string }> = ({ wor
               {!isCheckedOut && isCheckedIn && (
                 <button
                   onClick={handleCheckOut}
-                  disabled={acting}
-                  className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  disabled={acting || !checkoutUnlocked}
+                  className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-                  Check Out Now
+                  {acting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : !checkoutUnlocked ? (
+                    <Clock className="w-4 h-4" />
+                  ) : (
+                    <LogOut className="w-4 h-4" />
+                  )}
+                  {acting
+                    ? 'Checking out...'
+                    : !checkoutUnlocked
+                      ? `Available in ${formatRemaining(msRemaining)}`
+                      : 'Check Out Now'}
                 </button>
               )}
               {isCheckedOut && (

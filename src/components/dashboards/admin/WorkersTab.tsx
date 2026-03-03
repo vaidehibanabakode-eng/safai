@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, UserCheck, CheckCircle, Loader2, MapPin,
   X, Mail, Phone, Award, ClipboardList, TrendingUp,
+  Edit2, Trash2, MoreVertical,
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, updateDoc, deleteDoc, doc as firestoreDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 interface WorkerData {
@@ -31,6 +32,18 @@ const WorkersTab: React.FC = () => {
   const [selectedWorker, setSelectedWorker] = useState<WorkerData | null>(null);
   const [workerStats, setWorkerStats] = useState<WorkerStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
+  const [editWorker, setEditWorker] = useState<WorkerData | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<WorkerData | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    phone: '',
+    assignedZone: '',
+    workerType: '',
+    designation: '',
+  });
 
   useEffect(() => {
     const q = query(collection(db, 'users'), where('role', '==', 'Worker'));
@@ -65,10 +78,72 @@ const WorkersTab: React.FC = () => {
     }
   };
 
+  const showToast = (msg: string, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const handleEdit = (worker: WorkerData) => {
+    setEditForm({
+      name: worker.name || '',
+      phone: worker.phone || '',
+      assignedZone: worker.assignedZone || '',
+      workerType: worker.workerType || '',
+      designation: worker.designation || '',
+    });
+    setEditWorker(worker);
+    setActiveActionMenu(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editWorker || !editForm.name.trim()) {
+      showToast('Name is required.', false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateDoc(firestoreDoc(db, 'users', editWorker.id), {
+        name: editForm.name.trim(),
+        phone: editForm.phone.trim(),
+        assignedZone: editForm.assignedZone.trim(),
+        workerType: editForm.workerType.trim(),
+        designation: editForm.designation.trim(),
+      });
+      showToast('Worker updated successfully!');
+      setEditWorker(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Update failed';
+      showToast(msg, false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveConfirmed = async () => {
+    if (!confirmRemove) return;
+    setSaving(true);
+    try {
+      await deleteDoc(firestoreDoc(db, 'users', confirmRemove.id));
+      showToast(`${confirmRemove.name}'s profile removed.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Remove failed';
+      showToast(msg, false);
+    } finally {
+      setSaving(false);
+      setConfirmRemove(null);
+    }
+  };
+
   const uniqueZones = new Set(workers.map(w => w.assignedZone).filter(Boolean)).size;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in" onClick={() => setActiveActionMenu(null)}>
+      {toast && (
+        <div className={`fixed top-4 right-4 z-[200] flex items-center gap-3 px-5 py-3 rounded-xl shadow-xl text-white text-sm font-medium ${toast.ok ? 'bg-emerald-600' : 'bg-red-500'}`}>
+          {toast.msg}
+        </div>
+      )}
+
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Worker Management</h2>
         <p className="text-gray-600">Monitor and manage the field workforce</p>
@@ -160,13 +235,38 @@ const WorkersTab: React.FC = () => {
                         Registered
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => openDetails(worker)}
-                        className="text-emerald-600 hover:text-emerald-900 text-sm font-semibold transition-colors hover:underline"
-                      >
-                        View Details
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-right relative">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openDetails(worker)}
+                          className="text-emerald-600 hover:text-emerald-900 text-sm font-semibold transition-colors hover:underline"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setActiveActionMenu(activeActionMenu === worker.id ? null : worker.id); }}
+                          className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {activeActionMenu === worker.id && (
+                        <div className="absolute right-2 top-10 w-40 bg-white rounded-xl shadow-xl border border-gray-100 z-[100] overflow-hidden">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleEdit(worker); }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          >
+                            <Edit2 className="w-4 h-4 text-blue-500" /> Edit
+                          </button>
+                          <div className="h-px bg-gray-100" />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmRemove(worker); setActiveActionMenu(null); }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                          >
+                            <Trash2 className="w-4 h-4" /> Remove
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -289,6 +389,90 @@ const WorkersTab: React.FC = () => {
                 className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Worker Modal ────────────────────────────────────────────────── */}
+      {editWorker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-gray-900">Edit Worker</h3>
+              <button onClick={() => setEditWorker(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {[
+                { label: 'Full Name *', key: 'name', placeholder: 'e.g. Rajan Kumar' },
+                { label: 'Phone', key: 'phone', placeholder: 'e.g. +91 9876543210' },
+                { label: 'Assigned Zone', key: 'assignedZone', placeholder: 'e.g. Zone A' },
+                { label: 'Worker Type', key: 'workerType', placeholder: 'e.g. Waste Collector' },
+                { label: 'Designation', key: 'designation', placeholder: 'e.g. Senior Field Worker' },
+              ].map(({ label, key, placeholder }) => (
+                <div key={key} className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">{label}</label>
+                  <input
+                    type="text"
+                    value={editForm[key as keyof typeof editForm]}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                    placeholder={placeholder}
+                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setEditWorker(null)}
+                className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={saving}
+                className="px-6 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-all disabled:opacity-60 flex items-center gap-2"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Remove Confirmation Modal ────────────────────────────────────────── */}
+      {confirmRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-7 h-7 text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Remove Worker</h3>
+            <p className="text-gray-500 text-sm mb-1">
+              Remove <strong className="text-gray-800">{confirmRemove.name}</strong>'s profile?
+            </p>
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-5">
+              Note: Their Firebase Auth account remains active. Disable it in Firebase Console to prevent login.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemoveConfirmed}
+                disabled={saving}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Remove
               </button>
             </div>
           </div>

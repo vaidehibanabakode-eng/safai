@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Users, Shield, Activity, Loader2, CheckCircle, Clock } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface SystemStats {
     totalComplaints: number;
@@ -33,6 +34,59 @@ const OverviewTab: React.FC = () => {
         loading: true,
     });
     const [recentActivity, setRecentActivity] = useState<any[]>([]);
+
+    const { currentUser } = useAuth();
+    const [seeding, setSeeding] = useState(false);
+    const [seedDone, setSeedDone] = useState(false);
+    const [seedError, setSeedError] = useState<string | null>(null);
+
+    const SEED_COMPLAINTS = [
+        { title: 'Overflowing garbage bin near market', category: 'Waste Management', location: 'MG Road, Zone A', status: 'SUBMITTED', lat: 28.6139, lng: 77.2090 },
+        { title: 'Pothole causing accidents on road', category: 'Road Damage', location: 'NH-44, Zone B', status: 'UNDER_REVIEW', lat: 28.6200, lng: 77.2150 },
+        { title: 'Street light out for 3 days', category: 'Street Lighting', location: 'Sector 15, Zone C', status: 'ASSIGNED', lat: 28.6050, lng: 77.2200 },
+        { title: 'Blocked drainage causing flooding', category: 'Drainage/Sewage', location: 'Ring Road, Zone D', status: 'SUBMITTED', lat: 28.6300, lng: 77.2300 },
+        { title: 'Broken water pipe on main street', category: 'Water Supply', location: 'Civil Lines, Zone A', status: 'RESOLVED', lat: 28.6100, lng: 77.2050 },
+    ];
+
+    const SEED_INVENTORY = [
+        { name: 'Garbage Collection Trucks', quantity: 12, unit: 'vehicles', zone: 'All Zones' },
+        { name: 'Safety Gloves (pairs)', quantity: 500, unit: 'pairs', zone: 'All Zones' },
+        { name: 'High-Visibility Vests', quantity: 200, unit: 'pieces', zone: 'All Zones' },
+    ];
+
+    const handleSeedData = async () => {
+        if (!currentUser) {
+            setSeedError('You must be logged in to seed data.');
+            return;
+        }
+        setSeeding(true);
+        setSeedError(null);
+        try {
+            for (const c of SEED_COMPLAINTS) {
+                await addDoc(collection(db, 'complaints'), {
+                    ...c,
+                    citizenId: currentUser.uid,
+                    citizenName: currentUser.displayName || 'Demo User',
+                    description: `Demo complaint: ${c.title}`,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
+            }
+            for (const item of SEED_INVENTORY) {
+                await addDoc(collection(db, 'inventory'), {
+                    ...item,
+                    lastUpdated: serverTimestamp(),
+                });
+            }
+            setSeedDone(true);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            setSeedError(`Seed failed: ${msg}`);
+            console.error('Seed failed:', err);
+        } finally {
+            setSeeding(false);
+        }
+    };
 
     useEffect(() => {
         const complaintsUnsub = onSnapshot(collection(db, 'complaints'), (snap) => {
@@ -241,6 +295,36 @@ const OverviewTab: React.FC = () => {
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* ── Demo Data Seeder ───────────────────────────────────────────── */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-amber-900 mb-1">🌱 Demo Data Seeder</h3>
+                        <p className="text-sm text-amber-700">
+                            Populate Firestore with 5 sample complaints and 3 inventory items so dashboards show real data.
+                        </p>
+                        {seedDone && (
+                            <p className="mt-1 text-sm font-semibold text-green-700">✓ 5 complaints + 3 inventory items created!</p>
+                        )}
+                        {seedError && (
+                            <p className="mt-1 text-sm text-red-600">{seedError}</p>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleSeedData}
+                        disabled={seeding || seedDone}
+                        className="flex-shrink-0 px-5 py-2.5 bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {seeding ? (
+                            <>
+                                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Seeding...
+                            </>
+                        ) : seedDone ? '✓ Done' : 'Seed Demo Data'}
+                    </button>
                 </div>
             </div>
         </div>

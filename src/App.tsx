@@ -2,7 +2,6 @@ import { useState } from 'react';
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import SignupPage from './components/SignupPage';
-import ProfileSetupPage from './components/ProfileSetupPage';
 import SuperadminDashboard from './components/dashboards/SuperadminDashboard';
 import AdminDashboard from './components/dashboards/AdminDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
@@ -35,7 +34,7 @@ const LS_VIEW_KEY = 'currentView_safai';
 type ViewState = 'landing' | 'login' | 'signup';
 
 function App() {
-  const { currentUser, userProfile, loading, profileIncomplete } = useAuth();
+  const { currentUser, userProfile, loading } = useAuth();
 
   const [currentView, setCurrentView] = useState<ViewState>(() => {
     return (localStorage.getItem(LS_VIEW_KEY) as ViewState) || 'landing';
@@ -96,15 +95,6 @@ function App() {
       default:
         return <LandingPage onGetStarted={() => handleSetView('login')} />;
     }
-  }
-
-  // Logged in but Firestore profile is missing or incomplete → setup screen
-  if (profileIncomplete) {
-    return (
-      <ThemeProvider>
-        <ProfileSetupPage />
-      </ThemeProvider>
-    );
   }
 
   // Logged in but Firestore profile not loaded yet
