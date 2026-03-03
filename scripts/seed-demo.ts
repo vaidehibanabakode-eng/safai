@@ -12,10 +12,15 @@
  *     (Firebase Console → Project Settings → Service Accounts → Generate new private key)
  */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const admin = require('firebase-admin');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const serviceAccount = require('./serviceAccountKey.json');
+import admin from 'firebase-admin';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const serviceAccount = JSON.parse(
+  readFileSync(join(__dirname, 'serviceAccountKey.json'), 'utf-8')
+);
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 
