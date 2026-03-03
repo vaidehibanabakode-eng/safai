@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, ArrowLeft, CheckCircle } from 'lucide-react';
 import { UserRole } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { createUserWithEmailAndPassword, updateProfile, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, signInWithRedirect, getRedirectResult, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 
@@ -50,7 +50,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                             rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
                             phone: '',
                             address: '',
-                            citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+                            citizenID: `CIT-${user.uid.slice(-6).toUpperCase()}`,
                             assignedZone: '',
                             memberSince: serverTimestamp(),
                             preferences: { notifications: true, language: 'en' },
@@ -111,7 +111,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
                 phone: '',
                 address: '',
-                citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+                citizenID: `CIT-${user.uid.slice(-6).toUpperCase()}`,
                 assignedZone: '',
                 memberSince: serverTimestamp(),
                 preferences: {
@@ -138,7 +138,18 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
 
             // Translate common Firebase errors
             if (err.code === 'auth/email-already-in-use') {
-                setError('User with this email already exists');
+                // User already registered — sign them in directly; AuthContext will route to their dashboard
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    // Auth state change triggers AuthContext → App.tsx routing to dashboard automatically
+                } catch (signInErr: any) {
+                    const code = (signInErr as any).code || '';
+                    if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+                        setError('An account with this email already exists. Please sign in with the correct password.');
+                    } else {
+                        setError('Account already exists. Please use the Sign In page instead.');
+                    }
+                }
             } else if (err.code === 'auth/weak-password') {
                 setError('Password is too weak. Please use at least 6 characters.');
             } else if (err.code === 'permission-denied') {
@@ -282,8 +293,6 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                                         <option value="">{t('choose_role')}</option>
                                         <option value="worker">{t('role_worker')}</option>
                                         <option value="citizen">{t('role_citizen')}</option>
-                                        <option value="admin">Admin</option>
-                                        <option value="superadmin">Super Admin</option>
                                         <option value="green-champion">Green Champion</option>
                                     </select>
                                     <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
