@@ -3,7 +3,7 @@ import {
   ClipboardList, Camera, CheckCircle, GraduationCap,
   QrCode, BarChart3, Clock, Target,
   MapPin, X, Loader2, UserCircle, Settings,
-  CalendarCheck, LogIn, LogOut, Calendar
+  CalendarCheck, LogIn, LogOut, Calendar, DollarSign, IndianRupee
 } from 'lucide-react';
 
 import { User } from '../../App';
@@ -280,6 +280,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
     { icon: <Camera className="w-5 h-5" />, label: t('submit_proof'), active: activeTab === 'proof', onClick: () => setActiveTab('proof') },
     { icon: <CheckCircle className="w-5 h-5" />, label: t('attendance'), active: activeTab === 'attendance', onClick: () => setActiveTab('attendance') },
     { icon: <QrCode className="w-5 h-5" />, label: t('digital_id'), active: activeTab === 'digitalid', onClick: () => setActiveTab('digitalid') },
+    { icon: <DollarSign className="w-5 h-5" />, label: 'Salary', active: activeTab === 'salary', onClick: () => setActiveTab('salary') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <Settings className="w-5 h-5" />, label: t('settings'), active: activeTab === 'settings', onClick: () => setActiveTab('settings') },
     { icon: <UserCircle className="w-5 h-5" />, label: t('profile'), active: activeTab === 'profile', onClick: () => setActiveTab('profile') },
@@ -663,6 +664,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
             </div>
           </div>
         );
+      case 'salary': return <WorkerSalaryTab workerId={user.id} />;
       case 'training': return <TrainingSystem user={user} />;
       case 'settings': return <SettingsTab />;
       case 'profile': return <ProfilePage user={user} />;
@@ -1022,6 +1024,131 @@ const AttendanceTab: React.FC<{ workerId: string; workerName: string }> = ({ wor
               ))
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Worker Salary Tab ────────────────────────────────────────────────────────
+
+interface WorkerSalaryRecord {
+  id: string;
+  month: string;
+  baseSalary: number;
+  overtime: number;
+  deductions: number;
+  netSalary: number;
+  status: 'Paid' | 'Pending' | 'Overdue';
+  createdAt: any;
+}
+
+const formatINR = (amount: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+
+const STATUS_COLORS: Record<string, string> = {
+  Paid: 'bg-green-100 text-green-800',
+  Pending: 'bg-yellow-100 text-yellow-800',
+  Overdue: 'bg-red-100 text-red-800',
+};
+
+const WorkerSalaryTab: React.FC<{ workerId: string }> = ({ workerId }) => {
+  const [records, setRecords] = useState<WorkerSalaryRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'salary_records'),
+      where('workerId', '==', workerId)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const list: WorkerSalaryRecord[] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as WorkerSalaryRecord));
+      list.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setRecords(list);
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => unsub();
+  }, [workerId]);
+
+  const totalYTD = records.filter((r) => r.status === 'Paid').reduce((sum, r) => sum + (r.netSalary || 0), 0);
+  const lastPaid = records.find((r) => r.status === 'Paid');
+  const nextPending = records.find((r) => r.status === 'Pending');
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">My Salary</h2>
+        <p className="text-gray-600">Your salary records and payment history</p>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard
+          title="Total Earned (YTD)"
+          value={formatINR(totalYTD)}
+          icon={<IndianRupee className="w-6 h-6" />}
+          color="green"
+        />
+        <StatCard
+          title="Last Payment"
+          value={lastPaid?.month || '—'}
+          icon={<Calendar className="w-6 h-6" />}
+          color="blue"
+        />
+        <StatCard
+          title="Next Due"
+          value={nextPending?.month || '—'}
+          icon={<Clock className="w-6 h-6" />}
+          color="yellow"
+        />
+      </div>
+
+      {/* Salary Records Table */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <h3 className="font-semibold text-gray-900">Payment History</h3>
+        </div>
+        {loading ? (
+          <div className="flex justify-center p-10">
+            <Loader2 className="w-8 h-8 animate-spin text-green-500" />
+          </div>
+        ) : records.length === 0 ? (
+          <div className="text-center p-10 text-gray-500">
+            <DollarSign className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="font-medium">No salary records yet</p>
+            <p className="text-sm mt-1">Records will appear here once created by your admin.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase tracking-wider text-gray-500 bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="px-6 py-3 text-left">Month</th>
+                  <th className="px-6 py-3 text-right">Base Salary</th>
+                  <th className="px-6 py-3 text-right">Overtime</th>
+                  <th className="px-6 py-3 text-right">Deductions</th>
+                  <th className="px-6 py-3 text-right font-bold">Net Salary</th>
+                  <th className="px-6 py-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {records.map((rec) => (
+                  <tr key={rec.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-medium text-gray-900">{rec.month || '—'}</td>
+                    <td className="px-6 py-4 text-right text-gray-700">{formatINR(rec.baseSalary || 0)}</td>
+                    <td className="px-6 py-4 text-right text-green-700">+{formatINR(rec.overtime || 0)}</td>
+                    <td className="px-6 py-4 text-right text-red-700">-{formatINR(rec.deductions || 0)}</td>
+                    <td className="px-6 py-4 text-right font-bold text-gray-900">{formatINR(rec.netSalary || 0)}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-3 py-1 text-xs font-bold rounded-full ${STATUS_COLORS[rec.status] || 'bg-gray-100 text-gray-700'}`}>
+                        {rec.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
