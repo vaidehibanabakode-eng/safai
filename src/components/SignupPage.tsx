@@ -83,14 +83,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             return;
         }
 
-        const roleMap: Record<string, string> = {
-            worker: 'Worker',
-            citizen: 'Citizen',
-            admin: 'Admin',
-            superadmin: 'Superadmin',
-            'green-champion': 'Green-Champion'
-        };
-        const firestoreRole = roleMap[role] || 'Citizen';
+        const firestoreRole = ROLE_MAP[role] || 'Citizen';
 
         try {
             // 1. Create user in Firebase Auth
@@ -128,34 +121,35 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
         } catch (err: any) {
             console.error('🔥 Detailed Signup Error:', err);
 
-            // Critical: If auth succeeded but Firestore failed, we must sign out 
-            // to prevent the app from landing in a half-logged-in state.
-            try {
-                await auth.signOut();
-            } catch (signOutErr) {
-                console.error('Sign out error after partial failure:', signOutErr);
-            }
-
-            // Translate common Firebase errors
             if (err.code === 'auth/email-already-in-use') {
                 // User already registered — sign them in directly; AuthContext will route to their dashboard
                 try {
                     await signInWithEmailAndPassword(auth, email, password);
                     // Auth state change triggers AuthContext → App.tsx routing to dashboard automatically
                 } catch (signInErr: any) {
-                    const code = (signInErr as any).code || '';
+                    const code = signInErr.code || '';
                     if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
                         setError('An account with this email already exists. Please sign in with the correct password.');
                     } else {
                         setError('Account already exists. Please use the Sign In page instead.');
                     }
                 }
-            } else if (err.code === 'auth/weak-password') {
-                setError('Password is too weak. Please use at least 6 characters.');
-            } else if (err.code === 'permission-denied') {
-                setError('Database access denied. Your database is blocking the "' + firestoreRole + '" role. Please run the deployment command (see walkthrough.md) or update rules manually in Firebase Console.');
             } else {
-                setError('Failed to create account profile. Error: ' + (err.message || 'Unknown error'));
+                // Critical: If auth succeeded but Firestore failed, we must sign out
+                // to prevent the app from landing in a half-logged-in state.
+                try {
+                    await auth.signOut();
+                } catch (signOutErr) {
+                    console.error('Sign out error after partial failure:', signOutErr);
+                }
+
+                if (err.code === 'auth/weak-password') {
+                    setError('Password is too weak. Please use at least 6 characters.');
+                } else if (err.code === 'permission-denied') {
+                    setError('Database access denied. Your database is blocking the "' + firestoreRole + '" role. Please run the deployment command (see walkthrough.md) or update rules manually in Firebase Console.');
+                } else {
+                    setError('Failed to create account profile. Error: ' + (err.message || 'Unknown error'));
+                }
             }
         } finally {
             setIsLoading(false);
