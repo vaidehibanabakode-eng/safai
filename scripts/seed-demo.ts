@@ -25,6 +25,7 @@ const serviceAccount = JSON.parse(
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 
 const db    = admin.firestore();
+db.settings({ ignoreUndefinedProperties: true });
 const fauth = admin.auth();
 
 const DEMO_PASSWORD = 'Demo1234!';
