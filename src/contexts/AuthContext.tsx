@@ -71,13 +71,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                         // Resolve role from Firestore data — Firestore is the source of truth
                         // Validate that the role is one of the allowed values
-                        let resolvedRole: string = 'Citizen';
+                        let resolvedRole: string = 'citizen';
                         if (firestoreData && firestoreData.role) {
                             const validRoles = ['citizen', 'worker', 'admin', 'superadmin', 'green-champion'];
                             const normalizedRole = String(firestoreData.role).toLowerCase();
+                            
+                            // DEBUG: Log role resolution
+                            console.log('🔐 AuthContext role resolution:', {
+                                rawRole: firestoreData.role,
+                                normalizedRole,
+                                isValid: validRoles.includes(normalizedRole),
+                                userId: user.uid
+                            });
+                            
                             if (validRoles.includes(normalizedRole)) {
-                                resolvedRole = firestoreData.role;
+                                // Store normalized (lowercase) role for consistent comparison
+                                resolvedRole = normalizedRole;
+                            } else {
+                                console.warn('⚠️ Invalid role in Firestore:', firestoreData.role);
                             }
+                        } else {
+                            console.warn('⚠️ No role field in Firestore document for user:', user.uid);
                         }
 
                         setUserProfile({
@@ -99,12 +113,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     },
                     (error: any) => {
                         console.error("Error listening to user profile:", error);
-                        // Fallback
+                        // Fallback - use lowercase for consistency
                         setUserProfile({
                             uid: user.uid,
                             email: user.email || '',
                             name: user.displayName || 'User',
-                            role: 'Citizen',
+                            role: 'citizen',
                         });
                         setLoading(false);
                     }

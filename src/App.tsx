@@ -85,7 +85,9 @@ function App() {
         return (
           <SignupPage
             onSignupSuccess={(_email) => {
-              handleSetView('login');
+              // Don't redirect - user is already authenticated after signup
+              // AuthContext will detect the auth state and show dashboard
+              console.log('✅ Signup successful, waiting for auth state...');
             }}
             onNavigateToLogin={() => handleSetView('login')}
           />
@@ -108,14 +110,33 @@ function App() {
     );
   }
 
+  // If user is authenticated, clear any stored view state to prevent navigation issues
+  // This ensures that after login/signup, the user sees their dashboard
+  if (currentUser && userProfile) {
+    const storedView = localStorage.getItem(LS_VIEW_KEY);
+    if (storedView && storedView !== 'landing') {
+      localStorage.removeItem(LS_VIEW_KEY);
+    }
+  }
+
   // Build the activeUser from Firestore profile — this is the ONLY source of truth for role
+
+  // Normalize role to lowercase for consistent comparison
+  const normalizedRole = (userProfile.role?.toLowerCase() || 'citizen') as UserRole;
+  
+  // DEBUG: Log role information to help diagnose routing issues
+  console.log('🔍 ROLE DEBUG:', {
+    rawFirestoreRole: userProfile.role,
+    normalizedRole: normalizedRole,
+    userEmail: userProfile.email,
+    userId: userProfile.uid
+  });
 
   const activeUser: User = {
     id: userProfile.uid,
     email: userProfile.email,
     name: userProfile.name,
-    // Normalize role to lowercase
-    role: (userProfile.role?.toLowerCase() || 'citizen') as UserRole,
+    role: normalizedRole,
     phone: userProfile.phone,
     address: userProfile.address,
     citizenID: userProfile.citizenID,
@@ -124,11 +145,27 @@ function App() {
   };
 
   const renderDashboard = () => {
+    console.log('🎯 Rendering dashboard for role:', activeUser.role);
+    
     switch (activeUser.role) {
-      case 'superadmin': return <SuperadminDashboard user={activeUser} onLogout={handleLogout} />;
-      case 'admin':      return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
-      case 'worker':     return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
-      default:           return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'superadmin': 
+        console.log('✅ Loading SuperadminDashboard');
+        return <SuperadminDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'admin':      
+        console.log('✅ Loading AdminDashboard');
+        return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'worker':     
+        console.log('✅ Loading WorkerDashboard');
+        return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'green-champion':
+        console.log('✅ Loading CitizenDashboard (Green Champion)');
+        return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'citizen':
+        console.log('✅ Loading CitizenDashboard');
+        return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
+      default:
+        console.warn('⚠️ Unknown role, defaulting to CitizenDashboard:', activeUser.role);
+        return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
     }
   };
 

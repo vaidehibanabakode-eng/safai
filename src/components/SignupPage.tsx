@@ -31,13 +31,16 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             return;
         }
 
+        // Store roles in lowercase for consistent comparison throughout the app
         const roleMap: Record<string, string> = {
-            worker: 'Worker',
-            citizen: 'Citizen',
-            admin: 'Admin',
-            superadmin: 'Superadmin'
+            worker: 'worker',
+            citizen: 'citizen',
+            admin: 'admin',
+            superadmin: 'superadmin',
+            'green-champion': 'green-champion'
         };
-        const firestoreRole = roleMap[role] || 'Citizen';
+        const firestoreRole = roleMap[role] || 'citizen';
+        console.log('📝 Signup: Saving role to Firestore:', { selectedRole: role, firestoreRole });
 
         try {
             // 1. Create user in Firebase Auth
@@ -55,7 +58,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 name: name,
                 role: firestoreRole,
                 createdAt: serverTimestamp(),
-                rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
+                rewardPoints: firestoreRole === 'citizen' ? 0 : undefined,
                 phone: '',
                 address: '',
                 citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
@@ -107,13 +110,16 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             const userCredential = await signInWithPopup(auth, googleProvider);
             const user = userCredential.user;
 
+            // Store roles in lowercase for consistent comparison throughout the app
             const roleMap: Record<string, string> = {
-                worker: 'Worker',
-                citizen: 'Citizen',
-                admin: 'Admin',
-                superadmin: 'Superadmin'
+                worker: 'worker',
+                citizen: 'citizen',
+                admin: 'admin',
+                superadmin: 'superadmin',
+                'green-champion': 'green-champion'
             };
-            const firestoreRole = roleMap[role] || 'Citizen';
+            const firestoreRole = roleMap[role] || 'citizen';
+            console.log('📝 Google Signup: Saving role to Firestore:', { selectedRole: role, firestoreRole });
 
             // Check if user already exists in Firestore
             const docRef = doc(db, 'users', user.uid);
@@ -127,7 +133,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                     name: user.displayName || 'Google User',
                     role: firestoreRole,
                     createdAt: serverTimestamp(),
-                    rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
+                    rewardPoints: firestoreRole === 'citizen' ? 0 : undefined,
                     phone: '',
                     address: '',
                     citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
@@ -258,8 +264,9 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                                         required
                                     >
                                         <option value="">{t('choose_role')}</option>
-                                        <option value="worker">{t('role_worker')}</option>
                                         <option value="citizen">{t('role_citizen')}</option>
+                                        <option value="worker">{t('role_worker')}</option>
+                                        <option value="green-champion">Green Champion</option>
                                         <option value="admin">Admin</option>
                                         <option value="superadmin">Super Admin</option>
                                     </select>

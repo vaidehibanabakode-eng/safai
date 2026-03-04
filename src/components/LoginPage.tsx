@@ -66,11 +66,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
       // Only create profile if it doesn't exist
       // If user previously signed up, keep their existing role
       if (!docSnap.exists()) {
+        console.log('📝 Google Login: Creating new user with citizen role');
         await setDoc(docRef, {
           uid: user.uid,
           email: user.email,
           name: user.displayName || 'Google User',
-          role: 'Citizen',
+          role: 'citizen',  // lowercase for consistent comparison
           createdAt: serverTimestamp(),
           rewardPoints: 0,
           phone: '',
