@@ -137,9 +137,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
     (transcript) => setDescription((prev) => prev ? `${prev} ${transcript}` : transcript),
   );
 
-  // Photo-based AI (/api/analyze-photo) is active on first photo upload
-  const aiDismissedForRef = React.useRef<string>(''); // kept to avoid removing ref from JSX
-
   // AI photo analysis (vision-based)
   const [photoAiSuggestion, setPhotoAiSuggestion] = useState<{
     category: string;
