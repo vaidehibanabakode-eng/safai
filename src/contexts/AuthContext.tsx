@@ -27,6 +27,7 @@ interface AuthContextType {
     currentUser: FirebaseUser | null;
     userProfile: UserProfile | null;
     loading: boolean;
+    noDocument: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [noDocument, setNoDocument] = useState(false);
 
     useEffect(() => {
         let unsubscribeProfile: (() => void) | null = null;
@@ -59,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (user) {
                 // Set initial loading state for profile
                 setLoading(true);
+                setNoDocument(false);
 
                 // Start listening to the user profile document
                 const docRef = doc(db, 'users', user.uid);
@@ -67,6 +70,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         let firestoreData: any = null;
                         if (docSnap.exists()) {
                             firestoreData = docSnap.data();
+                            setNoDocument(false);
+                            console.log('✅ User document found in Firestore:', { uid: user.uid, data: firestoreData });
+                        } else {
+                            console.error('❌ NO USER DOCUMENT in Firestore for:', user.uid, user.email);
+                            console.error('   This user needs to sign up again or have their document created.');
+                            setNoDocument(true);
                         }
 
                         // Resolve role from Firestore data — Firestore is the source of truth
@@ -125,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 );
             } else {
                 setUserProfile(null);
+                setNoDocument(false);
                 setLoading(false);
             }
         });
@@ -138,7 +148,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const value = {
         currentUser,
         userProfile,
-        loading
+        loading,
+        noDocument,
     };
 
     return (

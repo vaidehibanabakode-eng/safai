@@ -196,18 +196,18 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             </div>
 
             {/* Right Side - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 bg-white">
-                <div className="w-full max-w-md space-y-6 sm:space-y-8 animate-in slide-in-from-right duration-500">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-white overflow-y-auto max-h-screen">
+                <div className="w-full max-w-md space-y-4 sm:space-y-5 animate-in slide-in-from-right duration-500 py-6">
                     <div className="text-center lg:text-left">
                         <button
                             onClick={onNavigateToLogin}
-                            className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-6 sm:mb-8 group"
+                            className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-4 group"
                         >
                             <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
                             {t('back_login')}
                         </button>
                         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('create_account')}</h2>
-                        <p className="mt-2 text-sm sm:text-base text-gray-600">{t('enter_details_register')}</p>
+                        <p className="mt-1 text-sm text-gray-600">{t('enter_details_register')}</p>
                     </div>
 
                     {error && (
@@ -217,12 +217,12 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                     )}
 
 
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3">
                         <button
                             type="button"
                             onClick={handleGoogleSignup}
                             disabled={isLoading}
-                            className="w-full bg-white text-gray-700 font-bold py-3.5 px-6 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transform transition-all duration-200 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                            className="w-full bg-white text-gray-700 font-semibold py-3 px-6 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transform transition-all duration-200 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                         >
                             <svg className="w-5 h-5" viewBox="0 0 24 24">
                                 <path
@@ -245,22 +245,22 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                             Sign up with Google
                         </button>
 
-                        <div className="relative flex items-center py-2">
+                        <div className="relative flex items-center py-1">
                             <div className="flex-grow border-t border-gray-200"></div>
-                            <span className="flex-shrink-0 mx-4 text-gray-400 text-sm font-medium">OR</span>
+                            <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-medium">OR</span>
                             <div className="flex-grow border-t border-gray-200"></div>
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-5">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('select_role')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('select_role')}</label>
                                 <div className="relative">
                                     <select
                                         value={role}
                                         onChange={(e) => setRole(e.target.value as UserRole)}
-                                        className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none appearance-none text-gray-900"
+                                        className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none appearance-none text-gray-900"
                                         required
                                     >
                                         <option value="">{t('choose_role')}</option>
@@ -277,36 +277,36 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('full_name')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('full_name')}</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
+                                    className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
                                     placeholder="John Doe"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('email_address')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('email_address')}</label>
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
+                                    className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
                                     placeholder="john@example.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('password')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('password')}</label>
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
+                                    className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
                                     placeholder="••••••••"
                                     required
                                 />
@@ -317,7 +317,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-emerald-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-100 transform transition-all duration-200 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                            className="w-full bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-100 transform transition-all duration-200 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
                         >
                             {isLoading ? (
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

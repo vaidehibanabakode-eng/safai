@@ -33,7 +33,7 @@ const LS_VIEW_KEY = 'currentView_safai';
 type ViewState = 'landing' | 'login' | 'signup';
 
 function App() {
-  const { currentUser, userProfile, loading } = useAuth();
+  const { currentUser, userProfile, loading, noDocument } = useAuth();
 
   const [currentView, setCurrentView] = useState<ViewState>(() => {
     return (localStorage.getItem(LS_VIEW_KEY) as ViewState) || 'landing';
@@ -96,6 +96,30 @@ function App() {
       default:
         return <LandingPage onGetStarted={() => handleSetView('login')} />;
     }
+  }
+
+  // Logged in but the Firestore user document does not exist — account not fully set up
+  if (noDocument) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-red-600 text-2xl font-bold">!</span>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Account Not Found</h2>
+          <p className="text-gray-500 text-sm mb-4">
+            Your account ({currentUser?.email}) is authenticated but has no profile in the database.
+            Please contact your administrator or sign up again.
+          </p>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // Logged in but Firestore profile not loaded yet

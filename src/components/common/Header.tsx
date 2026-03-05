@@ -93,6 +93,9 @@ const NotificationsDropdown: React.FC<{ user: User; onClose: () => void }> = ({ 
         });
         setItems(notifs);
         setLoading(false);
+      }, (err) => {
+        console.error('Notification listener error (citizen):', err.code, err.message);
+        setLoading(false);
       });
       return unsub;
     }
@@ -122,6 +125,9 @@ const NotificationsDropdown: React.FC<{ user: User; onClose: () => void }> = ({ 
         });
         setItems(notifs);
         setLoading(false);
+      }, (err) => {
+        console.error('Notification listener error (worker):', err.code, err.message);
+        setLoading(false);
       });
       return unsub;
     }
@@ -150,6 +156,9 @@ const NotificationsDropdown: React.FC<{ user: User; onClose: () => void }> = ({ 
         });
         setItems(notifs);
         setLoading(false);
+      }, (err) => {
+        console.error('Notification listener error (admin):', err.code, err.message);
+        setLoading(false);
       });
       return unsub;
     }
@@ -176,6 +185,9 @@ const NotificationsDropdown: React.FC<{ user: User; onClose: () => void }> = ({ 
           };
         });
         setItems(notifs);
+        setLoading(false);
+      }, (err) => {
+        console.error('Notification listener error (superadmin):', err.code, err.message);
         setLoading(false);
       });
       return unsub;
@@ -291,6 +303,8 @@ const Header: React.FC<HeaderProps> = ({ user, toggleSidebar, onProfileClick }) 
         return ms > lastSeen;
       }).length;
       setUnreadCount(count);
+    }, (err) => {
+      console.error('Unread count listener error:', err.code, err.message);
     });
 
     return unsub;
@@ -321,17 +335,16 @@ const Header: React.FC<HeaderProps> = ({ user, toggleSidebar, onProfileClick }) 
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30 transition-all duration-300">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Left: hamburger + logo */}
-          <div className="flex items-center gap-4">
+          {/* Left: logo + hamburger */}
+          <div className="flex items-center gap-3">
+            {/* Logo - always visible on left */}
+            <img src="/logo.png" alt="SafaiConnect" className="h-10 w-auto max-w-[140px] object-contain" />
             <button
               onClick={toggleSidebar}
               className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <div className="flex items-center gap-1 sm:gap-2 transition-transform hover:scale-105 duration-300">
-              <img src="/logo.png" alt="Safai Connect Logo" className="h-8 sm:h-10 w-auto object-contain drop-shadow-sm" />
-            </div>
           </div>
 
           {/* Right: language + bell + user */}

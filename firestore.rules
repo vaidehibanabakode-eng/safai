@@ -114,5 +114,14 @@ service cloud.firestore {
       allow delete: if isSuperadmin();
     }
 
+    // ── `training` collection ─────────────────────────────────────────────────
+    // Users manage their own training progress
+    match /training/{userId} {
+      allow read:   if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
   }
 }
