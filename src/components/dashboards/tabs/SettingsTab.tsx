@@ -79,9 +79,6 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
         }
     };
 
-    const handleTwoFactor = () => {
-        toastInfo('Two-factor authentication enrollment is coming soon. Stay tuned for updates!');
-    };
 
     const handlePrivacyPolicy = () => {
         window.open('https://safaiconnect.in/privacy', '_blank', 'noopener,noreferrer');
@@ -228,16 +225,6 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
                                 </span>
                             </div>
                             {!sendingReset && <ChevronRight className="w-4 h-4 text-gray-400" />}
-                        </button>
-                        <button
-                            onClick={handleTwoFactor}
-                            className="w-full flex items-center justify-between p-3 hover:bg-gray-50 rounded-xl transition-colors text-left group"
-                        >
-                            <div className="flex items-center gap-3">
-                                <Shield className="w-5 h-5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
-                                <span className="font-medium text-gray-700 group-hover:text-gray-900">{t('two_factor_auth')}</span>
-                            </div>
-                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Soon</span>
                         </button>
                         <button
                             onClick={handlePrivacyPolicy}
