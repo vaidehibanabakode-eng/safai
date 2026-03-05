@@ -20,6 +20,8 @@ interface Complaint {
     citizenId: string;
     imageUrl?: string;
     createdAt: any;
+    lat?: number;
+    lng?: number;
 }
 
 interface Worker {
@@ -208,13 +210,21 @@ const ComplaintsTab: React.FC = () => {
 
         setIsAssigning(true);
         try {
+            // Find the complaint early so we can copy GPS coords to each assignment
+            const assignedComplaint = complaints.find(c => c.id === selectedComplaintId);
+
             // Write to assignments collection for each worker
             for (const wId of selectedWorkerIds) {
                 await addDoc(collection(db, 'assignments'), {
                     complaintId: selectedComplaintId,
                     workerId: wId,
                     assignedAt: serverTimestamp(),
-                    workerStatus: 'ASSIGNED'
+                    workerStatus: 'ASSIGNED',
+                    // Copy GPS coords from complaint so WorkerRouteTab can show task on map
+                    ...(assignedComplaint?.lat != null && assignedComplaint?.lng != null && {
+                        lat: assignedComplaint.lat,
+                        lng: assignedComplaint.lng,
+                    }),
                 });
             }
 
@@ -226,7 +236,6 @@ const ComplaintsTab: React.FC = () => {
             });
 
             // Notify the assigned worker(s)
-            const assignedComplaint = complaints.find(c => c.id === selectedComplaintId);
             for (const wId of selectedWorkerIds) {
                 await addNotification(
                     wId,
