@@ -176,7 +176,7 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
           type: 'video-lecture',
           question: 'Essential Safety Protocols for Waste Collectors',
           videoTitle: 'Waste Management Safety',
-          videoUrl: 'Y2W0jPg2JBk', // Placeholder until specific ID confirmed
+          videoUrl: 'dGpVNEMaL88',
           points: 50,
           explanation: 'Safety is the top priority in waste management operations.'
         },
@@ -352,7 +352,7 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
           type: 'video-lecture',
           question: 'Strategic Waste Systems Management',
           videoTitle: 'Modern Waste Management Systems',
-          videoUrl: 'Y2W0jPg2JBk', // Placeholder
+          videoUrl: 'LH6e45-HJhU',
           points: 50,
           explanation: 'Effective management requires understanding the entire waste lifecycle.'
         },
