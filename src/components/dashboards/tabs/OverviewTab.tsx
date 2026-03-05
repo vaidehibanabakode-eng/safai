@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Users, Shield, Activity, Loader2, CheckCircle, Clock } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -40,43 +40,14 @@ const OverviewTab: React.FC = () => {
     const [seedDone, setSeedDone] = useState(false);
     const [seedError, setSeedError] = useState<string | null>(null);
 
-    // ── Demo Users Seeder ─────────────────────────────────────────────────────
-    const [seedingUsers, setSeedingUsers] = useState(false);
-    const [usersSeedDone, setUsersSeedDone] = useState(false);
-    const [usersSeedError, setUsersSeedError] = useState<string | null>(null);
-
+    // Display-only list — real seeding is done via `npx tsx scripts/seed-demo.ts`
     const DEMO_USERS = [
-        { uid: 'YYKEJBl64aOSHPQNunyPHuO3nOs1', email: 'soham@gmail.com',          name: 'Soham',          role: 'Superadmin' },
-        { uid: 'i0Z17SdVAuhrK12zz9dH5CHMUCQ2', email: 'superadmin@demo.com',       name: 'Super Admin',    role: 'Superadmin' },
-        { uid: 'tBz0lQ8DgNUMbgOERdKrt4cY5Gg1', email: 'admin@demo.com',            name: 'Admin Demo',     role: 'Admin'      },
-        { uid: '546cY1n3x2Q7JPe948ELxA5mSrg1', email: 'worker@demo.com',           name: 'Worker Demo',    role: 'Worker'     },
-        { uid: 'MCwBkI8jiKhsvXOFJMbnF2r8T3K3', email: 'citizan@demo.com',          name: 'Citizen Demo',   role: 'Citizen'    },
-        { uid: 'TKpAvBaQlFYTuEK2gwygWqXutig1', email: 'champion@demo.com',         name: 'Champion Demo',  role: 'green-champion' },
+        { email: 'superadmin@demo.com',  name: 'Super Admin',    role: 'Superadmin'     },
+        { email: 'admin@demo.com',        name: 'Admin Demo',     role: 'Admin'          },
+        { email: 'worker@demo.com',       name: 'Worker Demo',    role: 'Worker'         },
+        { email: 'citizen@demo.com',      name: 'Citizen Demo',   role: 'Citizen'        },
+        { email: 'champion@demo.com',     name: 'Champion Demo',  role: 'Green-Champion' },
     ];
-
-    const handleSeedUsers = async () => {
-        setSeedingUsers(true);
-        setUsersSeedError(null);
-        try {
-            for (const u of DEMO_USERS) {
-                await setDoc(doc(db, 'users', u.uid), {
-                    uid: u.uid,
-                    email: u.email,
-                    name: u.name,
-                    role: u.role,
-                    rewardPoints: 0,
-                    createdAt: serverTimestamp(),
-                }, { merge: true }); // merge:true preserves existing fields (e.g. phone, zone)
-            }
-            setUsersSeedDone(true);
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : 'Unknown error';
-            setUsersSeedError(`Failed: ${msg}`);
-            console.error('User seed failed:', err);
-        } finally {
-            setSeedingUsers(false);
-        }
-    };
 
     const SEED_COMPLAINTS = [
         { title: 'Overflowing garbage bin near market', category: 'Waste Management', location: 'MG Road, Zone A', status: 'SUBMITTED', lat: 28.6139, lng: 77.2090 },
@@ -366,40 +337,18 @@ const OverviewTab: React.FC = () => {
                 </div>
             </div>
 
-            {/* ── Demo Users Seeder ──────────────────────────────────────────── */}
+            {/* ── Demo Users Info ────────────────────────────────────────────── */}
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold text-blue-900 mb-1">👥 Demo Users Seeder</h3>
-                        <p className="text-sm text-blue-700">
-                            Creates / fixes all 6 user documents with correct roles and UIDs. Safe to run multiple times (merge mode).
-                        </p>
-                        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs text-blue-600 font-mono">
-                            {DEMO_USERS.map(u => (
-                                <span key={u.uid} className="bg-blue-100 px-2 py-0.5 rounded truncate">
-                                    {u.role}: {u.email}
-                                </span>
-                            ))}
-                        </div>
-                        {usersSeedDone && (
-                            <p className="mt-2 text-sm font-semibold text-green-700">✓ All 6 user documents created / updated!</p>
-                        )}
-                        {usersSeedError && (
-                            <p className="mt-1 text-sm text-red-600">{usersSeedError}</p>
-                        )}
-                    </div>
-                    <button
-                        onClick={handleSeedUsers}
-                        disabled={seedingUsers || usersSeedDone}
-                        className="flex-shrink-0 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                        {seedingUsers ? (
-                            <>
-                                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Seeding...
-                            </>
-                        ) : usersSeedDone ? '✓ Done' : 'Seed Demo Users'}
-                    </button>
+                <h3 className="text-lg font-bold text-blue-900 mb-1">👥 Demo Accounts</h3>
+                <p className="text-sm text-blue-700 mb-3">
+                    Run <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-xs">npx tsx scripts/seed-demo.ts</code> to create all demo accounts. Password: <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-xs">Demo1234!</code>
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs text-blue-600 font-mono">
+                    {DEMO_USERS.map(u => (
+                        <span key={u.email} className="bg-blue-100 px-2 py-0.5 rounded truncate">
+                            {u.role}: {u.email}
+                        </span>
+                    ))}
                 </div>
             </div>
         </div>

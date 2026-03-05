@@ -112,10 +112,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     (transcript) => setDescription((prev) => prev ? `${prev} ${transcript}` : transcript),
   );
 
-  // AI category suggestion (text-based)
+  // AI category suggestion (text-based) — placeholder until /api/categorize is deployed
   const aiDismissedForRef = React.useRef<string>('');
-  const [aiSuggestion, setAiSuggestion] = useState<{ category: string; confidence: number } | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestion] = useState<{ category: string; confidence: number } | null>(null);
+  const [aiLoading] = useState(false);
 
   // AI photo analysis (vision-based)
   const [photoAiSuggestion, setPhotoAiSuggestion] = useState<{
@@ -165,7 +165,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       setLoadingComplaints(false);
     });
     return () => unsubscribe();
-  }, [user, activeTab]);
+  }, [user]);
 
   // Load training progress for stats from Firestore
   const [trainingProgress, setTrainingProgress] = useState(0);
@@ -205,30 +205,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // AI auto-categorization: debounce 1.5s after description reaches 20 chars
-  React.useEffect(() => {
-    if (description.length < 20 || description === aiDismissedForRef.current) {
-      setAiSuggestion(null);
-      return;
-    }
-    setAiSuggestion(null);
-    const timer = setTimeout(async () => {
-      setAiLoading(true);
-      try {
-        const res = await fetch('/api/categorize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ description, language }),
-        });
-        if (res.ok) {
-          const data = await res.json() as { category: string; confidence: number };
-          setAiSuggestion(data);
-        }
-      } catch { /* fail silently — AI is non-blocking */ }
-      setAiLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [description, language]);
+  // AI auto-categorization (text-based) — disabled until /api/categorize endpoint is deployed
+  // Photo-based AI via /api/analyze-photo is active and handles categorization on photo upload
 
   const handleSaveDraft = () => {
     try {

@@ -231,10 +231,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
             <p className="text-xs text-amber-600 mb-3">Click a role to auto-fill demo credentials, then press Sign In.</p>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { role: 'Citizen',    email: 'citizen@demo.com',    icon: '🏘️', cls: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
-                { role: 'Worker',     email: 'worker@demo.com',     icon: '👷', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100' },
-                { role: 'Admin',      email: 'admin@demo.com',      icon: '📊', cls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
-                { role: 'Super Admin',email: 'superadmin@demo.com', icon: '🛡️', cls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
+                { role: 'Citizen',       email: 'citizen@demo.com',    icon: '🏘️', cls: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100' },
+                { role: 'Worker',        email: 'worker@demo.com',     icon: '👷', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100' },
+                { role: 'Admin',         email: 'admin@demo.com',      icon: '📊', cls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
+                { role: 'Super Admin',   email: 'superadmin@demo.com', icon: '🛡️', cls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
+                { role: 'Champion',      email: 'champion@demo.com',   icon: '🌿', cls: 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' },
               ].map(d => (
                 <button
                   key={d.role}
