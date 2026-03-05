@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useToast } from '../../contexts/ToastContext';
-import { addDoc, collection, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, where, onSnapshot, doc, updateDoc, orderBy, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../../lib/firebase';
 import {
@@ -26,6 +26,7 @@ import {
   PhoneCall,
   CalendarPlus,
   Trophy,
+  Award,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -67,6 +68,7 @@ const uploadWithRetry = async (
 interface CitizenDashboardProps {
   user: User;
   onLogout: () => void;
+  isChampion?: boolean;
 }
 
 
@@ -95,7 +97,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   );
 };
 
-const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) => {
+const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isChampion = false }) => {
   const { error: toastError, warning: toastWarning, info: toastInfo, success: toastSuccess } = useToast();
   const [activeTab, setActiveTab] = useState('home'); // Changed default to 'home' to match new key
   const [description, setDescription] = useState('');
@@ -167,6 +169,29 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
 
   // Load training progress for stats from Firestore
   const [trainingProgress, setTrainingProgress] = useState(0);
+
+  // ----------- Champion Hub state (only used when isChampion=true) -----------
+  const [leaderboard, setLeaderboard] = useState<Array<{
+    id: string; name: string; rewardPoints: number; role: string;
+  }>>([]);
+
+  React.useEffect(() => {
+    if (!isChampion) return;
+    const q = query(
+      collection(db, 'users'),
+      orderBy('rewardPoints', 'desc'),
+      limit(10)
+    );
+    const unsub = onSnapshot(q, snap => {
+      setLeaderboard(snap.docs.map(d => ({
+        id: d.id,
+        name: d.data().name || 'Anonymous',
+        rewardPoints: d.data().rewardPoints || 0,
+        role: d.data().role || 'Citizen',
+      })));
+    });
+    return () => unsub();
+  }, [isChampion]);
 
   React.useEffect(() => {
     if (!user) return;
@@ -510,6 +535,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
 
   const sidebarItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav_home'), active: activeTab === 'home', onClick: () => setActiveTab('home') },
+    ...(isChampion ? [{ icon: <Trophy className="w-5 h-5 text-yellow-500" />, label: 'Champion Hub', active: activeTab === 'champion', onClick: () => setActiveTab('champion') }] : []),
     { icon: <Truck className="w-5 h-5" />, label: 'Book Collection', active: activeTab === 'collection', onClick: () => setActiveTab('collection') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_education'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <AlertTriangle className="w-5 h-5" />, label: t('nav_report'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
@@ -1094,6 +1120,90 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       case 'settings': return <SettingsTab />;
       case 'profile':
         return <ProfilePage user={user} />;
+
+      case 'champion': {
+        const userRank = leaderboard.findIndex(e => e.id === user.id) + 1;
+        const myPoints = leaderboard.find(e => e.id === user.id)?.rewardPoints ?? (user as any).rewardPoints ?? 0;
+
+        const CHAMPION_BADGES = [
+          { id: 'comm-leader', icon: '🌿', label: 'Community Leader', desc: 'Submit 20+ reports', unlocked: myComplaints.length >= 20 },
+          { id: 'eco-warrior', icon: '♻️', label: 'Eco Warrior', desc: '10 issues resolved', unlocked: myComplaints.filter(c => ['RESOLVED', 'CLOSED'].includes(c.status)).length >= 10 },
+          { id: 'train-master', icon: '🎓', label: 'Training Master', desc: 'Complete all training', unlocked: trainingProgress >= 100 },
+          { id: 'top-champ', icon: '🏆', label: 'Top Champion', desc: 'Reach leaderboard top 3', unlocked: userRank > 0 && userRank <= 3 },
+        ];
+
+        return (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+                <Trophy className="w-8 h-8 text-yellow-500" />
+                Champion Hub
+              </h2>
+              <p className="text-gray-500 text-sm">Your exclusive champion dashboard</p>
+            </div>
+
+            {/* Stats bar */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-2xl p-5 border border-amber-200 text-center">
+                <p className="text-3xl font-bold text-amber-700">{userRank > 0 ? `#${userRank}` : '—'}</p>
+                <p className="text-xs text-amber-600 font-medium mt-1">Leaderboard Rank</p>
+              </div>
+              <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-5 border border-emerald-200 text-center">
+                <p className="text-3xl font-bold text-emerald-700">{myPoints}</p>
+                <p className="text-xs text-emerald-600 font-medium mt-1">Reward Points</p>
+              </div>
+              <div className="bg-gradient-to-br from-purple-50 to-violet-100 rounded-2xl p-5 border border-violet-200 text-center">
+                <p className="text-3xl font-bold text-violet-700">{CHAMPION_BADGES.filter(b => b.unlocked).length}/{CHAMPION_BADGES.length}</p>
+                <p className="text-xs text-violet-600 font-medium mt-1">Badges Earned</p>
+              </div>
+            </div>
+
+            {/* Champion-exclusive badges */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Award className="w-5 h-5 text-yellow-500" /> Champion Badges
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {CHAMPION_BADGES.map(badge => (
+                  <div key={badge.id} className={`rounded-xl p-4 text-center border-2 transition-all ${badge.unlocked ? 'border-yellow-300 bg-yellow-50' : 'border-gray-100 bg-gray-50 opacity-50 grayscale'}`}>
+                    <div className="text-3xl mb-2">{badge.icon}</div>
+                    <p className="font-semibold text-gray-900 text-sm">{badge.label}</p>
+                    <p className="text-xs text-gray-500 mt-1">{badge.desc}</p>
+                    {badge.unlocked && <p className="text-xs text-yellow-600 font-bold mt-2">✓ Earned</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Leaderboard */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-500" /> Top Champions
+              </h3>
+              {leaderboard.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-6">Loading leaderboard…</p>
+              ) : (
+                <div className="space-y-3">
+                  {leaderboard.map((entry, i) => (
+                    <div key={entry.id} className={`flex items-center gap-4 p-3 rounded-xl transition-colors ${entry.id === user.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-50'}`}>
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${i === 0 ? 'bg-yellow-400 text-white' : i === 1 ? 'bg-gray-300 text-white' : i === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">
+                          {entry.name}{entry.id === user.id ? ' (You)' : ''}
+                        </p>
+                        <p className="text-xs text-gray-500">{entry.rewardPoints} pts</p>
+                      </div>
+                      {i < 3 && <span className="text-lg">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
 
       default:
         return (

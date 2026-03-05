@@ -75,7 +75,7 @@ const GreenChampionDashboard: React.FC<GreenChampionDashboardProps> = ({ user, o
     <div className="flex flex-col min-h-screen">
       <GreenChampionBanner user={user} />
       <div className="flex-1">
-        <CitizenDashboard user={user} onLogout={onLogout} />
+        <CitizenDashboard user={user} onLogout={onLogout} isChampion={true} />
       </div>
     </div>
   );
