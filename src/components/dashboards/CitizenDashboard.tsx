@@ -431,6 +431,15 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     }
 
     setIsSubmitting(true);
+
+    // Helper to add timeout to promises
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms))
+      ]);
+    };
+
     try {
       let imageUrl = null;
 
@@ -439,8 +448,9 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
       if (photos.length > 0 && photos[0].file) {
         const file = photos[0].file;
         const fileRef = ref(storage, `complaints/${user.id}_${Date.now()}_${file.name}`);
-        await uploadBytes(fileRef, file);
-        imageUrl = await getDownloadURL(fileRef);
+        // Add 30s timeout to upload operations
+        await withTimeout(uploadBytes(fileRef, file), 30000, 'Image upload timed out. Please check your connection and try again.');
+        imageUrl = await withTimeout(getDownloadURL(fileRef), 10000, 'Failed to get image URL. Please try again.');
       }
 
       const complaintData = {
@@ -455,7 +465,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
         updatedAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'complaints'), complaintData);
+      await withTimeout(addDoc(collection(db, 'complaints'), complaintData), 15000, 'Failed to save complaint. Please try again.');
 
       setSubmitSuccess('Your complaint has been successfully submitted!');
       // Clear draft and reset form
