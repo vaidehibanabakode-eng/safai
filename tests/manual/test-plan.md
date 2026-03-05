@@ -1,5 +1,5 @@
 # Safai Connect — Manual QA Test Plan
-**Version:** 1.0  **Date:** 2026-03-04
+**Version:** 1.1  **Date:** 2026-03-04
 **Testers:** Run this before any demo, release, or major PR merge
 **Demo credentials:** All accounts use password `Demo1234!`
 
@@ -292,21 +292,11 @@ Login as **champion@demo.com / Demo1234!**
 | 129 | Dismiss AI suggestion | Chip hidden, form fields keep manual values | |
 | 130 | Upload photo that is NOT a civic issue | AI returns "Other" with low confidence | |
 
-### 7.2 Text Categorization (Google Gemini 1.5 Flash)
-**Requires GEMINI_API_KEY in Vercel environment variables**
-
+### 7.2 AI Error Handling
 | # | Step | Expected | Pass/Fail |
 |---|------|----------|-----------|
-| 131 | POST /api/categorize with "There is garbage overflow near market" | Returns `{category: "Waste Management", confidence: >0.7}` | |
-| 132 | POST /api/categorize with "Pothole on the road" | Returns `{category: "Road Damage"}` | |
-| 133 | POST /api/categorize with text < 5 chars | Returns 400 error | |
-| 134 | POST /api/categorize in Hindi | Returns valid English category | |
-
-### 7.3 AI Error Handling
-| # | Step | Expected | Pass/Fail |
-|---|------|----------|-----------|
-| 135 | Disable API key on server → upload photo | Graceful error, form still usable | |
-| 136 | Upload corrupted image file | No crash, AI suggestion skipped or error shown | |
+| 131 | Disable API key on server → upload photo | Graceful error, form still usable | |
+| 132 | Upload corrupted image file | No crash, AI suggestion skipped or error shown | |
 
 ---
 
@@ -314,11 +304,11 @@ Login as **champion@demo.com / Demo1234!**
 
 | # | Test | Expected | Pass/Fail |
 |---|------|----------|-----------|
-| 137 | Open on mobile viewport (375px) | Hamburger menu visible, sidebar hidden | |
-| 138 | Tap hamburger → sidebar opens | Sidebar slides in | |
-| 139 | Tap overlay → sidebar closes | Sidebar closes | |
-| 140 | All forms usable on mobile | No overflow, inputs focusable | |
-| 141 | Rotate to landscape | Layout adjusts, no broken overflow | |
+| 133 | Open on mobile viewport (375px) | Hamburger menu visible, sidebar hidden | |
+| 134 | Tap hamburger → sidebar opens | Sidebar slides in | |
+| 135 | Tap overlay → sidebar closes | Sidebar closes | |
+| 136 | All forms usable on mobile | No overflow, inputs focusable | |
+| 137 | Rotate to landscape | Layout adjusts, no broken overflow | |
 
 ---
 
@@ -326,9 +316,9 @@ Login as **champion@demo.com / Demo1234!**
 
 | # | Test | Expected | Pass/Fail |
 |---|------|----------|-----------|
-| 142 | Open Admin in Tab A, Citizen in Tab B | Both logged in simultaneously | |
-| 143 | Citizen submits new complaint | Admin overview counter increments in real time | |
-| 144 | Admin changes complaint status | Citizen track tab shows updated status | |
+| 138 | Open Admin in Tab A, Citizen in Tab B | Both logged in simultaneously | |
+| 139 | Citizen submits new complaint | Admin overview counter increments in real time | |
+| 140 | Admin changes complaint status | Citizen track tab shows updated status | |
 
 ---
 
@@ -336,9 +326,9 @@ Login as **champion@demo.com / Demo1234!**
 
 | # | Test | Expected | Pass/Fail |
 |---|------|----------|-----------|
-| 145 | Go offline → try to submit complaint | Graceful error, no crash | |
-| 146 | Invalid email on login | Error message shown | |
-| 147 | Navigate directly to / while logged out | Landing page, not dashboard | |
+| 141 | Go offline → try to submit complaint | Graceful error, no crash | |
+| 142 | Invalid email on login | Error message shown | |
+| 143 | Navigate directly to / while logged out | Landing page, not dashboard | |
 
 ---
 

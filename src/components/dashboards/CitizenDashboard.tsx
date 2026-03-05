@@ -112,7 +112,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     (transcript) => setDescription((prev) => prev ? `${prev} ${transcript}` : transcript),
   );
 
-  // AI text-categorization disabled — /api/categorize not yet deployed
   // Photo-based AI (/api/analyze-photo) is active on first photo upload
   const aiDismissedForRef = React.useRef<string>(''); // kept to avoid removing ref from JSX
 
@@ -203,9 +202,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
     } catch { /* ignore corrupt draft */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
-
-  // AI auto-categorization (text-based) — disabled until /api/categorize endpoint is deployed
-  // Photo-based AI via /api/analyze-photo is active and handles categorization on photo upload
 
   const handleSaveDraft = () => {
     try {
@@ -743,7 +739,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout }) =
                       {t('listening')}
                     </p>
                   )}
-                  {/* AI text-categorization chip — hidden until /api/categorize is deployed */}
                 </div>
 
                 <div>

@@ -26,7 +26,7 @@ safai-main/
 │   │   ├── admin.spec.ts         ← Overview, complaints mgmt, workers, verification
 │   │   ├── superadmin.spec.ts    ← System overview, admin mgmt, inventory
 │   │   ├── champion.spec.ts      ← Green banner, leaderboard rank, citizen features
-│   │   └── ai.spec.ts            ← /api/analyze-photo and /api/categorize endpoints
+│   │   └── ai.spec.ts            ← /api/analyze-photo endpoint (OpenAI GPT-4o Vision)
 │   └── manual/
 │       └── test-plan.md          ← Option C: step-by-step QA checklist
 └── docs/plans/
@@ -45,7 +45,7 @@ safai-main/
 | **admin** | Dashboard Overview heading; Complaints tab; Workers tab; Verification tab |
 | **superadmin** | System Overview heading; Admin Management tab; Inventory tab |
 | **champion** | Green Champion banner; Active Champion badge; CitizenDashboard features visible |
-| **ai** | POST /api/analyze-photo → `{category,severity,description,confidence}`; POST /api/categorize → `{category,confidence,reason}` |
+| **ai** | POST /api/analyze-photo → `{category,severity,description,confidence}` (OpenAI GPT-4o Vision, gated on `OPENAI_API_KEY`) |
 
 ---
 
@@ -56,7 +56,7 @@ safai-main/
 - **Base URL:** `http://localhost:5173` (Vite dev server; auto-started by Playwright)
 - **Timeout:** 15s per action, 30s per test
 - **Screenshots:** on failure only
-- **AI tests:** gated behind `OPENAI_API_KEY` / `GEMINI_API_KEY` env vars — skipped gracefully if missing
+- **AI tests:** gated behind `OPENAI_API_KEY` env var — skipped gracefully if missing
 - **Retries:** 0 locally, 1 on CI
 
 ---
@@ -94,8 +94,8 @@ npx playwright test --headed
 # View HTML report after run
 npx playwright show-report
 
-# Run AI endpoint tests (requires env vars)
-OPENAI_API_KEY=... GEMINI_API_KEY=... npx playwright test tests/e2e/ai.spec.ts
+# Run AI endpoint tests (requires OpenAI API key)
+OPENAI_API_KEY=... npx playwright test tests/e2e/ai.spec.ts
 ```
 
 ---
