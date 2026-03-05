@@ -9,7 +9,18 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "mobile:build": "npm run build && npx cap sync",
-    "mobile:android": "npx cap open android"
+    "mobile:android": "npx cap open android",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:auth": "playwright test tests/e2e/auth.spec.ts",
+    "test:citizen": "playwright test tests/e2e/citizen.spec.ts",
+    "test:worker": "playwright test tests/e2e/worker.spec.ts",
+    "test:admin": "playwright test tests/e2e/admin.spec.ts",
+    "test:superadmin": "playwright test tests/e2e/superadmin.spec.ts",
+    "test:champion": "playwright test tests/e2e/champion.spec.ts",
+    "test:ai": "playwright test tests/e2e/ai.spec.ts",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
     "@capacitor/android": "^8.1.0",
@@ -34,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@playwright/test": "^1.58.2",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^24.5.2",
     "@types/react": "^18.3.24",
