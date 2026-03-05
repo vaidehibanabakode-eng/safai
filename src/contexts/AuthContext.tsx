@@ -40,6 +40,8 @@ export const useAuth = () => {
     return context;
 };
 
+// Role normalization — see src/lib/roles.ts for the authoritative mapping.
+// Keep this map in sync with ROUTING_ROLE_MAP in roles.ts.
 // Maps every known role format → canonical Firestore-cased value used by App.tsx routing
 const ROLE_NORMALIZATION: Record<string, string> = {
     'superadmin':    'Superadmin',
