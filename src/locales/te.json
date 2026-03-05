@@ -122,5 +122,15 @@
     "listening": "వింటున్నాను...",
     "speak_description": "వివరణ చెప్పండి",
     "salary": "జీతం",
-    "upload_training": "శిక్షణ అప్‌లోడ్"
+    "upload_training": "శిక్షణ అప్‌లోడ్",
+    "champion_hub": "Champion Hub",
+    "champion_hub_subtitle": "Your exclusive champion dashboard",
+    "champion_leaderboard_rank": "Leaderboard Rank",
+    "champion_reward_points": "Reward Points",
+    "champion_badges_earned": "Badges Earned",
+    "champion_badges_title": "Champion Badges",
+    "champion_top_champions": "Top Champions",
+    "champion_loading_leaderboard": "Loading leaderboard…",
+    "champion_no_champions": "No champions yet — be the first!",
+    "champion_you": "(You)"
 }

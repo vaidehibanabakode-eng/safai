@@ -39,6 +39,7 @@ import { User } from '../../App';
 import StatCard from '../common/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useSpeechToText } from '../../hooks/useSpeechToText';
+import { useAuth } from '../../contexts/AuthContext';
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB — guard against storage/retry-limit-exceeded on mobile
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -98,6 +99,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isChampion = false }) => {
+  const { userProfile } = useAuth();
   const { error: toastError, warning: toastWarning, info: toastInfo, success: toastSuccess } = useToast();
   const [activeTab, setActiveTab] = useState('home'); // Changed default to 'home' to match new key
   const [description, setDescription] = useState('');
@@ -172,11 +174,13 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
 
   // ----------- Champion Hub state (only used when isChampion=true) -----------
   const [leaderboard, setLeaderboard] = useState<Array<{
-    id: string; name: string; rewardPoints: number; role: string;
+    id: string; name: string; rewardPoints: number;
   }>>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   React.useEffect(() => {
     if (!isChampion) return;
+    setLeaderboardLoading(true);
     const q = query(
       collection(db, 'users'),
       orderBy('rewardPoints', 'desc'),
@@ -187,11 +191,24 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
         id: d.id,
         name: d.data().name || 'Anonymous',
         rewardPoints: d.data().rewardPoints || 0,
-        role: d.data().role || 'Citizen',
       })));
+      setLeaderboardLoading(false);
+    }, () => {
+      setLeaderboardLoading(false);
     });
     return () => unsub();
   }, [isChampion]);
+
+  const championBadges = React.useMemo(() => {
+    if (!isChampion) return [];
+    const userRankForBadge = leaderboard.findIndex(e => e.id === user.id) + 1;
+    return [
+      { id: 'comm-leader', icon: '🌿', label: 'Community Leader', desc: 'Submit 20+ reports', unlocked: myComplaints.length >= 20 },
+      { id: 'eco-warrior', icon: '♻️', label: 'Eco Warrior', desc: '10 issues resolved', unlocked: myComplaints.filter(c => ['RESOLVED', 'CLOSED'].includes(c.status)).length >= 10 },
+      { id: 'train-master', icon: '🎓', label: 'Training Master', desc: 'Complete all training', unlocked: trainingProgress >= 100 },
+      { id: 'top-champ', icon: '🏆', label: 'Top Champion', desc: 'Reach leaderboard top 3', unlocked: userRankForBadge > 0 && userRankForBadge <= 3 },
+    ];
+  }, [isChampion, myComplaints, trainingProgress, leaderboard, user.id]);
 
   React.useEffect(() => {
     if (!user) return;
@@ -535,7 +552,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
 
   const sidebarItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav_home'), active: activeTab === 'home', onClick: () => setActiveTab('home') },
-    ...(isChampion ? [{ icon: <Trophy className="w-5 h-5 text-yellow-500" />, label: 'Champion Hub', active: activeTab === 'champion', onClick: () => setActiveTab('champion') }] : []),
+    ...(isChampion ? [{ icon: <Trophy className="w-5 h-5 text-yellow-500" />, label: t('champion_hub'), active: activeTab === 'champion', onClick: () => setActiveTab('champion') }] : []),
     { icon: <Truck className="w-5 h-5" />, label: 'Book Collection', active: activeTab === 'collection', onClick: () => setActiveTab('collection') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_education'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <AlertTriangle className="w-5 h-5" />, label: t('nav_report'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
@@ -1123,48 +1140,41 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
 
       case 'champion': {
         const userRank = leaderboard.findIndex(e => e.id === user.id) + 1;
-        const myPoints = leaderboard.find(e => e.id === user.id)?.rewardPoints ?? (user as any).rewardPoints ?? 0;
-
-        const CHAMPION_BADGES = [
-          { id: 'comm-leader', icon: '🌿', label: 'Community Leader', desc: 'Submit 20+ reports', unlocked: myComplaints.length >= 20 },
-          { id: 'eco-warrior', icon: '♻️', label: 'Eco Warrior', desc: '10 issues resolved', unlocked: myComplaints.filter(c => ['RESOLVED', 'CLOSED'].includes(c.status)).length >= 10 },
-          { id: 'train-master', icon: '🎓', label: 'Training Master', desc: 'Complete all training', unlocked: trainingProgress >= 100 },
-          { id: 'top-champ', icon: '🏆', label: 'Top Champion', desc: 'Reach leaderboard top 3', unlocked: userRank > 0 && userRank <= 3 },
-        ];
+        const myPoints = leaderboard.find(e => e.id === user.id)?.rewardPoints ?? (userProfile?.rewardPoints ?? 0);
 
         return (
           <div className="space-y-8 animate-in fade-in duration-500">
             <div>
               <h2 className="text-3xl font-bold text-gray-900 mb-1 flex items-center gap-2">
                 <Trophy className="w-8 h-8 text-yellow-500" />
-                Champion Hub
+                {t('champion_hub')}
               </h2>
-              <p className="text-gray-500 text-sm">Your exclusive champion dashboard</p>
+              <p className="text-gray-500 text-sm">{t('champion_hub_subtitle')}</p>
             </div>
 
             {/* Stats bar */}
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-2xl p-5 border border-amber-200 text-center">
                 <p className="text-3xl font-bold text-amber-700">{userRank > 0 ? `#${userRank}` : '—'}</p>
-                <p className="text-xs text-amber-600 font-medium mt-1">Leaderboard Rank</p>
+                <p className="text-xs text-amber-600 font-medium mt-1">{t('champion_leaderboard_rank')}</p>
               </div>
               <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-5 border border-emerald-200 text-center">
                 <p className="text-3xl font-bold text-emerald-700">{myPoints}</p>
-                <p className="text-xs text-emerald-600 font-medium mt-1">Reward Points</p>
+                <p className="text-xs text-emerald-600 font-medium mt-1">{t('champion_reward_points')}</p>
               </div>
               <div className="bg-gradient-to-br from-purple-50 to-violet-100 rounded-2xl p-5 border border-violet-200 text-center">
-                <p className="text-3xl font-bold text-violet-700">{CHAMPION_BADGES.filter(b => b.unlocked).length}/{CHAMPION_BADGES.length}</p>
-                <p className="text-xs text-violet-600 font-medium mt-1">Badges Earned</p>
+                <p className="text-3xl font-bold text-violet-700">{championBadges.filter(b => b.unlocked).length}/{championBadges.length}</p>
+                <p className="text-xs text-violet-600 font-medium mt-1">{t('champion_badges_earned')}</p>
               </div>
             </div>
 
             {/* Champion-exclusive badges */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Award className="w-5 h-5 text-yellow-500" /> Champion Badges
+                <Award className="w-5 h-5 text-yellow-500" /> {t('champion_badges_title')}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {CHAMPION_BADGES.map(badge => (
+                {championBadges.map(badge => (
                   <div key={badge.id} className={`rounded-xl p-4 text-center border-2 transition-all ${badge.unlocked ? 'border-yellow-300 bg-yellow-50' : 'border-gray-100 bg-gray-50 opacity-50 grayscale'}`}>
                     <div className="text-3xl mb-2">{badge.icon}</div>
                     <p className="font-semibold text-gray-900 text-sm">{badge.label}</p>
@@ -1178,10 +1188,12 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
             {/* Leaderboard */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-500" /> Top Champions
+                <Trophy className="w-5 h-5 text-yellow-500" /> {t('champion_top_champions')}
               </h3>
-              {leaderboard.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-6">Loading leaderboard…</p>
+              {leaderboardLoading ? (
+                <p className="text-gray-400 text-sm text-center py-6">{t('champion_loading_leaderboard')}</p>
+              ) : leaderboard.length === 0 ? (
+                <p className="text-gray-400 text-sm text-center py-6">{t('champion_no_champions')}</p>
               ) : (
                 <div className="space-y-3">
                   {leaderboard.map((entry, i) => (
@@ -1191,7 +1203,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 text-sm truncate">
-                          {entry.name}{entry.id === user.id ? ' (You)' : ''}
+                          {entry.name}{entry.id === user.id ? ` ${t('champion_you')}` : ''}
                         </p>
                         <p className="text-xs text-gray-500">{entry.rewardPoints} pts</p>
                       </div>

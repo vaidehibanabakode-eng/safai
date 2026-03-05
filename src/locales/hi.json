@@ -369,5 +369,15 @@
     "qr_scan_label": "पहचान सत्यापित करने के लिए स्कैन करें",
     "id_card_footer": "SafaiConnect — सफाई कर्मचारियों को सशक्त बनाना",
     "salary": "वेतन",
-    "upload_training": "प्रशिक्षण अपलोड"
+    "upload_training": "प्रशिक्षण अपलोड",
+    "champion_hub": "Champion Hub",
+    "champion_hub_subtitle": "Your exclusive champion dashboard",
+    "champion_leaderboard_rank": "Leaderboard Rank",
+    "champion_reward_points": "Reward Points",
+    "champion_badges_earned": "Badges Earned",
+    "champion_badges_title": "Champion Badges",
+    "champion_top_champions": "Top Champions",
+    "champion_loading_leaderboard": "Loading leaderboard…",
+    "champion_no_champions": "No champions yet — be the first!",
+    "champion_you": "(You)"
 }
