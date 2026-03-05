@@ -86,26 +86,21 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
 
   const loadUserProgress = async () => {
     try {
-      // Progress stored in users/{uid}.trainingProgress (user-writable per Firestore rules)
-      const docRef = doc(db, 'users', user.id);
+      const docRef = doc(db, 'training', user.id);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        const raw = docSnap.data();
-        // Support new location (trainingProgress field) — legacy data in training collection is ignored
-        const data = raw.trainingProgress;
-        if (data && data.completedModules !== undefined) {
-          setUserProgress({
-            completedModules: data.completedModules || [],
-            totalPoints: data.totalPoints || 0,
-            certificates: data.certificates || [],
-            currentStreak: data.currentStreak || 0,
-            lastActivityDate: data.lastActivityDate || null,
-            hearts: data.hearts !== undefined ? data.hearts : 5,
-            level: data.level || 1,
-            xp: data.xp || 0,
-            achievements: data.achievements || []
-          });
-        }
+        const data = docSnap.data();
+        setUserProgress({
+          completedModules: data.completedModules || [],
+          totalPoints: data.totalPoints || 0,
+          certificates: data.certificates || [],
+          currentStreak: data.currentStreak || 0,
+          lastActivityDate: data.lastActivityDate || null,
+          hearts: data.hearts !== undefined ? data.hearts : 5,
+          level: data.level || 1,
+          xp: data.xp || 0,
+          achievements: data.achievements || []
+        });
       }
     } catch (error) {
       console.error('Error loading training progress:', error);
@@ -115,12 +110,9 @@ const TrainingSystem: React.FC<TrainingSystemProps> = ({ user }) => {
   const saveUserProgress = async (progress: UserProgress) => {
     setUserProgress(progress);
     try {
-      // Save under users/{uid}.trainingProgress — user-writable per Firestore rules
-      await setDoc(
-        doc(db, 'users', user.id),
-        { trainingProgress: { ...progress, userId: user.id } },
-        { merge: true }
-      );
+      // Also ensuring we save userId for comprehensive tracking
+      const dataToSave = { ...progress, userId: user.id };
+      await setDoc(doc(db, 'training', user.id), dataToSave, { merge: true });
     } catch (error) {
       console.error('Error saving training progress:', error);
     }

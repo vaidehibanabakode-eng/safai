@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { UserPlus, ArrowLeft, CheckCircle } from 'lucide-react';
 import { UserRole } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { createUserWithEmailAndPassword, updateProfile, signInWithRedirect, getRedirectResult, signOut, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 
@@ -11,12 +11,6 @@ interface SignupPageProps {
     onNavigateToLogin: () => void;
 }
 
-const ROLE_MAP: Record<string, string> = {
-    citizen: 'Citizen',
-    worker: 'Worker',
-    'green-champion': 'Green-Champion',
-};
-
 const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLogin }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -24,50 +18,6 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
     const [role, setRole] = useState<UserRole | ''>('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-
-    // Handle the result when Google redirects back after signup
-    useEffect(() => {
-        getRedirectResult(auth)
-            .then(async (result) => {
-                if (!result?.user) return;
-                const user = result.user;
-                const pendingRole = sessionStorage.getItem('pendingGoogleSignupRole') || 'citizen';
-                sessionStorage.removeItem('pendingGoogleSignupRole');
-                const firestoreRole = ROLE_MAP[pendingRole] || 'Citizen';
-                setIsLoading(true);
-                try {
-                    const docRef = doc(db, 'users', user.uid);
-                    const docSnap = await getDoc(docRef);
-                    if (!docSnap.exists()) {
-                        await setDoc(docRef, {
-                            uid: user.uid,
-                            email: user.email,
-                            name: user.displayName || 'Google User',
-                            role: firestoreRole,
-                            createdAt: serverTimestamp(),
-                            rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
-                            phone: '',
-                            address: '',
-                            citizenID: `CIT-${user.uid.slice(-6).toUpperCase()}`,
-                            assignedZone: '',
-                            memberSince: serverTimestamp(),
-                            preferences: { notifications: true, language: 'en' },
-                        });
-                    }
-                    await signOut(auth);
-                    onSignupSuccess(user.email || 'Google User');
-                } finally {
-                    setIsLoading(false);
-                }
-            })
-            .catch((err: any) => {
-                if (err.code && err.code !== 'auth/no-current-user') {
-                    console.error('Google Signup Redirect Error:', err);
-                    setError(`Google sign-up failed (${err.code}). Please try again.`);
-                    sessionStorage.removeItem('pendingGoogleSignupRole');
-                }
-            });
-    }, []);
     const { t } = useLanguage();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -81,7 +31,16 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             return;
         }
 
-        const firestoreRole = ROLE_MAP[role] || 'Citizen';
+        // Store roles in lowercase for consistent comparison throughout the app
+        const roleMap: Record<string, string> = {
+            worker: 'worker',
+            citizen: 'citizen',
+            admin: 'admin',
+            superadmin: 'superadmin',
+            'green-champion': 'green-champion'
+        };
+        const firestoreRole = roleMap[role] || 'citizen';
+        console.log('📝 Signup: Saving role to Firestore:', { selectedRole: role, firestoreRole });
 
         try {
             // 1. Create user in Firebase Auth
@@ -99,10 +58,10 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 name: name,
                 role: firestoreRole,
                 createdAt: serverTimestamp(),
-                rewardPoints: firestoreRole === 'Citizen' ? 0 : undefined,
+                rewardPoints: firestoreRole === 'citizen' ? 0 : undefined,
                 phone: '',
                 address: '',
-                citizenID: `CIT-${user.uid.slice(-6).toUpperCase()}`,
+                citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
                 assignedZone: '',
                 memberSince: serverTimestamp(),
                 preferences: {
@@ -111,43 +70,28 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                 }
             });
 
-            // 4. Sign out so there is no race between onAuthStateChanged and setDoc.
-            //    The Firestore profile now exists; when the user logs in fresh they go
-            //    straight to their dashboard without hitting ProfileSetupPage.
-            await signOut(auth);
+            // 4. Notify success only after Firestore write completes
             onSignupSuccess(email);
         } catch (err: any) {
             console.error('🔥 Detailed Signup Error:', err);
 
-            if (err.code === 'auth/email-already-in-use') {
-                // User already registered — sign them in directly; AuthContext will route to their dashboard
-                try {
-                    await signInWithEmailAndPassword(auth, email, password);
-                    // Auth state change triggers AuthContext → App.tsx routing to dashboard automatically
-                } catch (signInErr: any) {
-                    const code = signInErr.code || '';
-                    if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-                        setError('An account with this email already exists. Please sign in with the correct password.');
-                    } else {
-                        setError('Account already exists. Please use the Sign In page instead.');
-                    }
-                }
-            } else {
-                // Critical: If auth succeeded but Firestore failed, we must sign out
-                // to prevent the app from landing in a half-logged-in state.
-                try {
-                    await auth.signOut();
-                } catch (signOutErr) {
-                    console.error('Sign out error after partial failure:', signOutErr);
-                }
+            // Critical: If auth succeeded but Firestore failed, we must sign out 
+            // to prevent the app from landing in a half-logged-in state.
+            try {
+                await auth.signOut();
+            } catch (signOutErr) {
+                console.error('Sign out error after partial failure:', signOutErr);
+            }
 
-                if (err.code === 'auth/weak-password') {
-                    setError('Password is too weak. Please use at least 6 characters.');
-                } else if (err.code === 'permission-denied') {
-                    setError('Database access denied. Your database is blocking the "' + firestoreRole + '" role. Please run the deployment command (see walkthrough.md) or update rules manually in Firebase Console.');
-                } else {
-                    setError('Failed to create account profile. Error: ' + (err.message || 'Unknown error'));
-                }
+            // Translate common Firebase errors
+            if (err.code === 'auth/email-already-in-use') {
+                setError('User with this email already exists');
+            } else if (err.code === 'auth/weak-password') {
+                setError('Password is too weak. Please use at least 6 characters.');
+            } else if (err.code === 'permission-denied') {
+                setError('Database access denied. Your database is blocking the "' + firestoreRole + '" role. Please run the deployment command (see walkthrough.md) or update rules manually in Firebase Console.');
+            } else {
+                setError('Failed to create account profile. Error: ' + (err.message || 'Unknown error'));
             }
         } finally {
             setIsLoading(false);
@@ -159,17 +103,54 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             setError('Please select a role before signing up.');
             return;
         }
+
         setError('');
         setIsLoading(true);
         try {
-            // Store selected role so the post-redirect useEffect can read it
-            sessionStorage.setItem('pendingGoogleSignupRole', role);
-            await signInWithRedirect(auth, googleProvider);
-            // Page navigates away — code below does not run
+            const userCredential = await signInWithPopup(auth, googleProvider);
+            const user = userCredential.user;
+
+            // Store roles in lowercase for consistent comparison throughout the app
+            const roleMap: Record<string, string> = {
+                worker: 'worker',
+                citizen: 'citizen',
+                admin: 'admin',
+                superadmin: 'superadmin',
+                'green-champion': 'green-champion'
+            };
+            const firestoreRole = roleMap[role] || 'citizen';
+            console.log('📝 Google Signup: Saving role to Firestore:', { selectedRole: role, firestoreRole });
+
+            // Check if user already exists in Firestore
+            const docRef = doc(db, 'users', user.uid);
+            const docSnap = await getDoc(docRef);
+
+            if (!docSnap.exists()) {
+                // First time Google Sign in - assign SELECTED role (not always Citizen)
+                await setDoc(docRef, {
+                    uid: user.uid,
+                    email: user.email,
+                    name: user.displayName || 'Google User',
+                    role: firestoreRole,
+                    createdAt: serverTimestamp(),
+                    rewardPoints: firestoreRole === 'citizen' ? 0 : undefined,
+                    phone: '',
+                    address: '',
+                    citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+                    assignedZone: '',
+                    memberSince: serverTimestamp(),
+                    preferences: {
+                        notifications: true,
+                        language: 'en'
+                    }
+                });
+            }
+
+            onSignupSuccess(user.email || 'Google User');
         } catch (err: any) {
             console.error('Google Signup Error:', err);
-            setError(`Google sign-up failed (${err.code || 'unknown'}). Please try again.`);
-            sessionStorage.removeItem('pendingGoogleSignupRole');
+            setError('Failed to sign up with Google. Please try again.');
+        } finally {
             setIsLoading(false);
         }
     };
@@ -215,18 +196,18 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             </div>
 
             {/* Right Side - Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 lg:p-12 bg-white">
-                <div className="w-full max-w-md space-y-6 sm:space-y-8 animate-in slide-in-from-right duration-500">
+            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-white overflow-y-auto max-h-screen">
+                <div className="w-full max-w-md space-y-4 sm:space-y-5 animate-in slide-in-from-right duration-500 py-6">
                     <div className="text-center lg:text-left">
                         <button
                             onClick={onNavigateToLogin}
-                            className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-6 sm:mb-8 group"
+                            className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-emerald-600 transition-colors mb-4 group"
                         >
                             <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
                             {t('back_login')}
                         </button>
                         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">{t('create_account')}</h2>
-                        <p className="mt-2 text-sm sm:text-base text-gray-600">{t('enter_details_register')}</p>
+                        <p className="mt-1 text-sm text-gray-600">{t('enter_details_register')}</p>
                     </div>
 
                     {error && (
@@ -236,12 +217,12 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                     )}
 
 
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3">
                         <button
                             type="button"
                             onClick={handleGoogleSignup}
                             disabled={isLoading}
-                            className="w-full bg-white text-gray-700 font-bold py-3.5 px-6 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transform transition-all duration-200 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                            className="w-full bg-white text-gray-700 font-semibold py-3 px-6 rounded-xl border border-gray-200 hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transform transition-all duration-200 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                         >
                             <svg className="w-5 h-5" viewBox="0 0 24 24">
                                 <path
@@ -264,28 +245,30 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                             Sign up with Google
                         </button>
 
-                        <div className="relative flex items-center py-2">
+                        <div className="relative flex items-center py-1">
                             <div className="flex-grow border-t border-gray-200"></div>
-                            <span className="flex-shrink-0 mx-4 text-gray-400 text-sm font-medium">OR</span>
+                            <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-medium">OR</span>
                             <div className="flex-grow border-t border-gray-200"></div>
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-5">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('select_role')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('select_role')}</label>
                                 <div className="relative">
                                     <select
                                         value={role}
                                         onChange={(e) => setRole(e.target.value as UserRole)}
-                                        className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none appearance-none text-gray-900"
+                                        className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none appearance-none text-gray-900"
                                         required
                                     >
                                         <option value="">{t('choose_role')}</option>
-                                        <option value="worker">{t('role_worker')}</option>
                                         <option value="citizen">{t('role_citizen')}</option>
+                                        <option value="worker">{t('role_worker')}</option>
                                         <option value="green-champion">Green Champion</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="superadmin">Super Admin</option>
                                     </select>
                                     <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
                                         <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path></svg>
@@ -294,36 +277,36 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('full_name')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('full_name')}</label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
+                                    className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
                                     placeholder="John Doe"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('email_address')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('email_address')}</label>
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
+                                    className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
                                     placeholder="john@example.com"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t('password')}</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">{t('password')}</label>
                                 <input
                                     type="password"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
+                                    className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
                                     placeholder="••••••••"
                                     required
                                 />
@@ -334,7 +317,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-emerald-600 text-white font-bold py-4 px-6 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-100 transform transition-all duration-200 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+                            className="w-full bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-emerald-700 focus:ring-4 focus:ring-emerald-100 transform transition-all duration-200 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
                         >
                             {isLoading ? (
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

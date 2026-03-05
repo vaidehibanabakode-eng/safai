@@ -72,6 +72,25 @@ interface CitizenDashboardProps {
   isChampion?: boolean;
 }
 
+// Self-contained Speech Recognition type shim (avoids needing @types/dom-speech-recognition)
+interface ISpeechRecognitionResult { readonly length: number;[index: number]: { transcript: string } }
+interface ISpeechRecognitionEvent { readonly results: ISpeechRecognitionResult[] }
+interface ISpeechRecognition {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: ISpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+declare global {
+  interface Window {
+    SpeechRecognition: new () => ISpeechRecognition;
+    webkitSpeechRecognition: new () => ISpeechRecognition;
+  }
+}
 
 // Add StatusBadge component logic outside the main component or inside as a helper
 const StatusBadge = ({ status }: { status: string }) => {
@@ -102,6 +121,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
   const { userProfile } = useAuth();
   const { error: toastError, warning: toastWarning, info: toastInfo, success: toastSuccess } = useToast();
   const [activeTab, setActiveTab] = useState('home'); // Changed default to 'home' to match new key
+  const [isListening, setIsListening] = useState(false);
   const [description, setDescription] = useState('');
   const [issueType, setIssueType] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +130,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
   const DRAFT_KEY = `draft_complaint_${user?.id}`;
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const { t, language } = useLanguage();
   const { isListening, startStop: toggleMic, error: speechError } = useSpeechToText(
     language,
@@ -364,50 +385,19 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
     setPhotos((prev) => [...prev, ...toAdd]);
     // Capture GPS for each new photo
     toAdd.forEach((_, i) => captureGpsForPhoto(startIndex + i));
-    // Analyse first photo with AI vision when it's the first one added
-    if (photos.length === 0 && toAdd.length > 0) {
-      analyzePhotoWithAI(toAdd[0].file);
-    }
     e.target.value = '';
   };
 
   const removePhoto = (index: number) => {
     setPhotos((prev) => {
       URL.revokeObjectURL(prev[index].preview);
-      const next = prev.filter((_, i) => i !== index);
-      if (next.length === 0) setPhotoAiSuggestion(null);
-      return next;
+      return prev.filter((_, i) => i !== index);
     });
-  };
-
-  const analyzePhotoWithAI = async (file: File) => {
-    setPhotoAiLoading(true);
-    setPhotoAiSuggestion(null);
-    try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const res = await fetch('/api/analyze-photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType: file.type || 'image/jpeg' }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPhotoAiSuggestion(data);
-      }
-    } catch { /* fail silently — AI is non-blocking */ }
-    setPhotoAiLoading(false);
   };
 
   // ----------- GPS location state -----------
   const [location, setLocation] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
-  const [gpsLat, setGpsLat] = useState<number | null>(null);
-  const [gpsLng, setGpsLng] = useState<number | null>(null);
 
   const fetchLocation = async () => {
     setLocationLoading(true);
@@ -435,9 +425,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
         longitude = position.coords.longitude;
       }
 
-      setGpsLat(latitude);
-      setGpsLng(longitude);
-
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
@@ -455,6 +442,42 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
     }
   };
 
+  // ----------- Voice – Microphone for Report Issue -----------
+  const toggleMic = () => {
+    const SpeechRecognitionAPI =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      toastInfo('Speech recognition is not supported in this browser. Please use Chrome.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang =
+      language === 'ur' ? 'ur-PK' : language === 'sd' ? 'sd' : 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onresult = (event: ISpeechRecognitionEvent) => {
+      const transcript = event.results
+        .map((r) => r[0].transcript)
+        .join('');
+      setDescription(transcript);
+    };
+
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
 
   // ----------- Voice – Read Aloud for Dashboard summary -----------
   const readAloud = () => {
@@ -493,6 +516,15 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
     }
 
     setIsSubmitting(true);
+
+    // Helper to add timeout to promises
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, errorMsg: string): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMsg)), ms))
+      ]);
+    };
+
     try {
       let imageUrl = null;
 
@@ -500,14 +532,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
       // The schema currently supports a single imageUrl, so we take the first.
       if (photos.length > 0 && photos[0].file) {
         const file = photos[0].file;
-        // Guard against large files that cause storage/retry-limit-exceeded on mobile
-        if (file.size > MAX_PHOTO_BYTES) {
-          toastError('Photo too large — please use a photo under 5 MB.');
-          setIsSubmitting(false);
-          return;
-        }
         const fileRef = ref(storage, `complaints/${user.id}_${Date.now()}_${file.name}`);
-        imageUrl = await uploadWithRetry(fileRef, file);
+        // Add 30s timeout to upload operations
+        await withTimeout(uploadBytes(fileRef, file), 30000, 'Image upload timed out. Please check your connection and try again.');
+        imageUrl = await withTimeout(getDownloadURL(fileRef), 10000, 'Failed to get image URL. Please try again.');
       }
 
       const complaintData = {
@@ -519,11 +547,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
         citizenId: user.id,
         imageUrl: imageUrl,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        ...(gpsLat !== null && gpsLng !== null && { lat: gpsLat, lng: gpsLng }),
+        updatedAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'complaints'), complaintData);
+      await withTimeout(addDoc(collection(db, 'complaints'), complaintData), 15000, 'Failed to save complaint. Please try again.');
 
       setSubmitSuccess('Your complaint has been successfully submitted!');
       // Clear draft and reset form
@@ -532,21 +559,13 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
       setDescription('');
       setLocation('');
       setPhotos([]);
-      setGpsLat(null);
-      setGpsLng(null);
 
       // Clear success message after 4s
       setTimeout(() => setSubmitSuccess(''), 4000);
 
     } catch (err: any) {
-      console.error('Submission error:', err);
-      if (err?.code === 'storage/retry-limit-exceeded') {
-        toastError('Photo upload failed: poor connection. Try a smaller photo or a stronger signal.');
-      } else if (err?.code === 'storage/unauthorized') {
-        toastError('Photo upload not permitted. Please contact support.');
-      } else {
-        toastError('Failed to submit. Please try again.');
-      }
+      console.error("Error submitting complaint:", err);
+      setSubmitError(err.message || 'Failed to submit complaint. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -772,12 +791,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
                       {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                     </button>
                   </div>
-                  {speechError && (
-                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />
-                      {speechError}
-                    </p>
-                  )}
                   {isListening && (
                     <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
                       <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse inline-block" />
@@ -827,55 +840,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
                           ) : null}
                         </div>
                       ))}
-                    </div>
-                  )}
-
-                  {/* Photo AI analysis result */}
-                  {(photoAiLoading || photoAiSuggestion) && (
-                    <div className="mt-2 mb-3">
-                      {photoAiLoading && (
-                        <span className="flex items-center gap-1.5 text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-3 py-1 w-fit">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          AI analysing photo...
-                        </span>
-                      )}
-                      {photoAiSuggestion && !photoAiLoading && (
-                        <div className="flex items-start gap-2 flex-wrap p-3 bg-orange-50 border border-orange-200 rounded-xl">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-orange-700 mb-0.5">📸 AI Photo Analysis</p>
-                            <p className="text-xs text-orange-800">
-                              <span className="font-medium">{photoAiSuggestion.category}</span>
-                              {' · '}
-                              <span className={`font-medium ${photoAiSuggestion.severity === 'high' ? 'text-red-600' : photoAiSuggestion.severity === 'medium' ? 'text-yellow-600' : 'text-green-600'}`}>
-                                {photoAiSuggestion.severity} severity
-                              </span>
-                              {' · '}
-                              {Math.round(photoAiSuggestion.confidence * 100)}% confident
-                            </p>
-                            <p className="text-xs text-gray-600 mt-0.5 italic">"{photoAiSuggestion.description}"</p>
-                          </div>
-                          <div className="flex gap-1.5 flex-shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIssueType(photoAiSuggestion.category);
-                                if (!description.trim()) setDescription(photoAiSuggestion.description);
-                                setPhotoAiSuggestion(null);
-                              }}
-                              className="text-xs bg-orange-600 text-white rounded-full px-3 py-1 hover:bg-orange-700 transition-colors"
-                            >
-                              Apply
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPhotoAiSuggestion(null)}
-                              className="text-xs text-gray-500 hover:text-gray-700 rounded-full px-2 py-1"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
 

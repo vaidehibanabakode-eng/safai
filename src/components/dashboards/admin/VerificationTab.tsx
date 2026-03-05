@@ -6,12 +6,10 @@ import {
 import StatCard from '../../common/StatCard';
 import {
     collection, query, where, onSnapshot, getDocs, doc,
-    getDoc, updateDoc, serverTimestamp, increment
+    getDoc, updateDoc, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useToast } from '../../../contexts/ToastContext';
-import { useNotifications } from '../../../contexts/NotificationContext';
-import { sendPushNotification } from '../../../lib/fcm';
 
 interface VerificationEntry {
     assignmentId: string;
@@ -25,12 +23,10 @@ interface VerificationEntry {
     evidenceImageUrl?: string;
     evidenceNotes?: string;
     complaintStatus: string;
-    citizenId?: string;
 }
 
 const VerificationTab: React.FC = () => {
     const { error: toastError } = useToast();
-    const { addNotification } = useNotifications();
     const [entries, setEntries] = useState<VerificationEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [approvedCount, setApprovedCount] = useState(0);
@@ -86,7 +82,6 @@ const VerificationTab: React.FC = () => {
                         evidenceImageUrl: evidence?.imageUrl,
                         evidenceNotes: evidence?.notes,
                         complaintStatus: complaint.status,
-                        citizenId: complaint.citizenId || complaint.userId,
                     });
                 } catch (e) {
                     console.error('Error fetching verification entry:', e);
@@ -111,38 +106,6 @@ const VerificationTab: React.FC = () => {
                 status: 'RESOLVED',
                 updatedAt: serverTimestamp(),
             });
-            // Increment citizen reward points
-            if (entry.citizenId) {
-                try {
-                    await updateDoc(doc(db, 'users', entry.citizenId), {
-                        rewardPoints: increment(10)
-                    });
-                } catch (e) {
-                    console.warn('Could not increment reward points:', e);
-                }
-            }
-            // Notify the citizen
-            if (entry.citizenId) {
-                await addNotification(
-                    entry.citizenId,
-                    `Your complaint "${entry.complaintTitle}" has been resolved! You earned 10 reward points.`,
-                    'complaint_resolved',
-                    entry.complaintId
-                );
-            }
-            // FCM push to citizen
-            try {
-                const citizenSnap = await getDoc(doc(db, 'users', entry.citizenId ?? ''));
-                const fcmToken = citizenSnap.data()?.fcmToken as string | undefined;
-                if (fcmToken) {
-                    await sendPushNotification(
-                        [fcmToken],
-                        '✅ Complaint Resolved',
-                        `Your complaint "${entry.complaintTitle}" has been resolved! +10 reward points`,
-                        { complaintId: entry.complaintId }
-                    );
-                }
-            } catch { /* FCM push is non-critical */ }
             setIsModalOpen(false);
             setSelectedEntry(null);
         } catch (e) {

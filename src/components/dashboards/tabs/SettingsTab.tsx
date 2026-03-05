@@ -10,8 +10,6 @@ import {
     ChevronRight,
     Loader2,
     ExternalLink,
-    Moon,
-    Sun,
 } from 'lucide-react';
 import { User } from '../../../App';
 import LanguageSwitcher from '../../common/LanguageSwitcher';
@@ -23,7 +21,7 @@ import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../../lib/firebase';
 import packageInfo from '../../../../package.json';
 
-import { useTheme } from '../../../contexts/ThemeContext';
+// import { useTheme } from '../../../contexts/ThemeContext'; // Removed
 
 interface SettingsTabProps {
     user?: User;
@@ -88,10 +86,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
         window.location.href = 'mailto:support@safaiconnect.in?subject=SafaiConnect Support Request';
     };
 
-    const { theme, toggleTheme } = useTheme();
+    // const { theme, toggleTheme } = useTheme(); // Removed for forced light mode
     const { t } = useLanguage();
 
-    const isDark = theme === 'dark';
+    // const isDark = theme === 'dark'; // Removed
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
@@ -121,24 +119,6 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${isDark ? 'bg-indigo-900 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}>
-                                    {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                                </div>
-                                <div>
-                                    <p className="font-medium text-gray-900 text-sm">{t('dark_mode') ?? 'Dark Mode'}</p>
-                                    <p className="text-xs text-gray-500">{isDark ? 'Dark theme active' : 'Light theme active'}</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={toggleTheme}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDark ? 'bg-indigo-600' : 'bg-gray-200'}`}
-                                aria-label="Toggle dark mode"
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isDark ? 'translate-x-6' : 'translate-x-1'}`} />
-                            </button>
-                        </div>
 
                     </div>
                 </div>

@@ -8,9 +8,6 @@ import {
   LayoutDashboard,
   UserCircle,
   Settings,
-  FileText,
-  Map as MapIcon,
-  Megaphone,
 } from 'lucide-react';
 import { User } from '../../App';
 import Layout from '../common/Layout';
@@ -25,9 +22,6 @@ import WorkersTab from './admin/WorkersTab';
 import VerificationTab from './admin/VerificationTab';
 import SalaryTab from './admin/SalaryTab';
 import SettingsTab from './tabs/SettingsTab';
-import ReportsTab from './tabs/ReportsTab';
-import HeatmapTab from './HeatmapTab';
-import BroadcastPanel from '../admin/BroadcastPanel';
 
 interface AdminDashboardProps {
   user: User;
@@ -45,9 +39,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
     { icon: <UserCheck className="w-5 h-5" />, label: t('work_verification'), active: activeTab === 'verification', onClick: () => setActiveTab('verification') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <DollarSign className="w-5 h-5" />, label: t('salary_tracking'), active: activeTab === 'salary', onClick: () => setActiveTab('salary') },
-    { icon: <FileText className="w-5 h-5" />, label: 'Reports', active: activeTab === 'reports', onClick: () => setActiveTab('reports') },
-    { icon: <MapIcon className="w-5 h-5" />, label: 'Heatmap', active: activeTab === 'heatmap', onClick: () => setActiveTab('heatmap') },
-    { icon: <Megaphone className="w-5 h-5" />, label: 'Broadcast', active: activeTab === 'broadcast', onClick: () => setActiveTab('broadcast') },
     { icon: <Settings className="w-5 h-5" />, label: t('settings'), active: activeTab === 'settings', onClick: () => setActiveTab('settings') },
     { icon: <UserCircle className="w-5 h-5" />, label: t('profile'), active: activeTab === 'profile', onClick: () => setActiveTab('profile') },
   ];
@@ -65,9 +56,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
       case 'training':
         return <TrainingSystem user={user} />;
       case 'salary': return <SalaryTab onNavigate={setActiveTab} />;
-      case 'reports': return <ReportsTab />;
-      case 'heatmap': return <HeatmapTab />;
-      case 'broadcast': return <BroadcastPanel />;
       case 'settings': return <SettingsTab />;
       case 'profile': return <ProfilePage user={user} />;
       default: return <OverviewTab onNavigate={setActiveTab} />;

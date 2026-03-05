@@ -10,14 +10,11 @@ import {
     Clock,
     MapPin,
     ChevronDown,
-    Loader2,
-    Printer,
-    Trophy,
-    Star,
+    Loader2
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { collection, query, onSnapshot, orderBy, getDocs, doc, getDoc, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 interface Complaint {
@@ -49,19 +46,6 @@ interface DayStat {
 interface CategoryStat {
     name: string;
     count: number;
-}
-
-interface MonthStat {
-    label: string;
-    submitted: number;
-    resolved: number;
-}
-
-interface WorkerPerf {
-    workerId: string;
-    name: string;
-    tasksCompleted: number;
-    avgRating: number;
 }
 
 // SVG bar chart (vertical)
@@ -124,43 +108,6 @@ const HBarChart: React.FC<{ data: CategoryStat[]; maxVal: number }> = ({ data, m
     );
 };
 
-const LineChart: React.FC<{ data: MonthStat[] }> = ({ data }) => {
-    const W = 460, H = 120, padL = 8, padB = 22;
-    const maxVal = Math.max(...data.map(d => d.submitted), 1);
-    const xStep = (W - padL) / Math.max(data.length - 1, 1);
-    const toY = (v: number) => H - (v / maxVal) * H;
-    const toX = (i: number) => padL + i * xStep;
-
-    const submittedPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(d.submitted).toFixed(1)}`).join(' ');
-    const resolvedPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(d.resolved).toFixed(1)}`).join(' ');
-
-    return (
-        <svg viewBox={`0 0 ${W + 10} ${H + padB + 18}`} className="w-full" style={{ maxHeight: 180 }}>
-            {/* Legend */}
-            <circle cx={padL} cy={-5} r={4} fill="#3b82f6" />
-            <text x={padL + 8} y={-1} fontSize={9} fill="#6b7280">Submitted</text>
-            <circle cx={padL + 75} cy={-5} r={4} fill="#10b981" />
-            <text x={padL + 83} y={-1} fontSize={9} fill="#6b7280">Resolved</text>
-            {/* Grid */}
-            {[0, 0.5, 1].map((f, i) => (
-                <line key={i} x1={padL} x2={W} y1={H * (1 - f)} y2={H * (1 - f)} stroke="#f3f4f6" strokeWidth="1" />
-            ))}
-            {/* Submitted line */}
-            <path d={submittedPath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            {/* Resolved line */}
-            <path d={resolvedPath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            {/* Dots */}
-            {data.map((d, i) => (
-                <g key={i}>
-                    <circle cx={toX(i)} cy={toY(d.submitted)} r={3.5} fill="#3b82f6" />
-                    <circle cx={toX(i)} cy={toY(d.resolved)} r={3.5} fill="#10b981" />
-                    <text x={toX(i)} y={H + padB - 2} textAnchor="middle" fontSize={9} fill="#9ca3af">{d.label}</text>
-                </g>
-            ))}
-        </svg>
-    );
-};
-
 const PERIODS = [
     { label: 'This Week', days: 7 },
     { label: 'This Month', days: 30 },
@@ -173,8 +120,6 @@ const ReportsTab: React.FC = () => {
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [periodIdx, setPeriodIdx] = useState(1);
     const [showPeriodMenu, setShowPeriodMenu] = useState(false);
-    const [workerPerf, setWorkerPerf] = useState<WorkerPerf[]>([]);
-    const [workerPerfLoading, setWorkerPerfLoading] = useState(true);
 
     useEffect(() => {
         // Try ordered query first; fall back if composite index missing
@@ -201,60 +146,6 @@ const ReportsTab: React.FC = () => {
         }
         return () => unsubscribe && unsubscribe();
     }, []);
-
-    // Fetch worker performance: assignments completed + user names + ratings
-    useEffect(() => {
-        let cancelled = false;
-        async function fetchWorkerPerf() {
-            try {
-                const [assignSnap, ratingSnap] = await Promise.all([
-                    getDocs(query(collection(db, 'assignments'), where('workerStatus', '==', 'COMPLETED'))),
-                    getDocs(collection(db, 'ratings')),
-                ]);
-                if (cancelled) return;
-
-                const countMap: Record<string, number> = {};
-                assignSnap.forEach(d => {
-                    const wId = d.data().workerId as string;
-                    if (wId) countMap[wId] = (countMap[wId] || 0) + 1;
-                });
-
-                const ratingMap: Record<string, { sum: number; count: number }> = {};
-                ratingSnap.forEach(d => {
-                    const { workerId, rating } = d.data();
-                    if (workerId && rating) {
-                        if (!ratingMap[workerId]) ratingMap[workerId] = { sum: 0, count: 0 };
-                        ratingMap[workerId].sum += Number(rating);
-                        ratingMap[workerId].count++;
-                    }
-                });
-
-                const workerIds = Object.keys(countMap);
-                if (!workerIds.length) { setWorkerPerf([]); setWorkerPerfLoading(false); return; }
-
-                const userDocs = await Promise.all(workerIds.map(id => getDoc(doc(db, 'users', id))));
-                if (cancelled) return;
-
-                const results: WorkerPerf[] = workerIds.map((wId, i) => {
-                    const rd = ratingMap[wId];
-                    return {
-                        workerId: wId,
-                        name: (userDocs[i].data()?.name as string) ?? 'Worker',
-                        tasksCompleted: countMap[wId],
-                        avgRating: rd ? rd.sum / rd.count : 0,
-                    };
-                });
-                results.sort((a, b) => b.tasksCompleted - a.tasksCompleted);
-                setWorkerPerf(results.slice(0, 10));
-            } catch (err) {
-                console.warn('[ReportsTab] Worker perf fetch failed:', err);
-            } finally {
-                if (!cancelled) setWorkerPerfLoading(false);
-            }
-        }
-        fetchWorkerPerf();
-        return () => { cancelled = true; };
-    }, [complaints.length]); // re-fetch when complaint count changes as proxy for data refresh
 
     const selectedPeriod = PERIODS[periodIdx];
 
@@ -343,31 +234,6 @@ const ReportsTab: React.FC = () => {
 
     const categoryMax = Math.max(...categoryData.map(d => d.count), 1);
 
-    // 6-month trend data
-    const monthlyData: MonthStat[] = useMemo(() => {
-        const months: MonthStat[] = [];
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(1);
-            d.setMonth(d.getMonth() - i);
-            months.push({ label: d.toLocaleString('default', { month: 'short' }), submitted: 0, resolved: 0 });
-        }
-        complaints.forEach(c => {
-            const ts = c.createdAt;
-            if (!ts) return;
-            try {
-                const ms = typeof ts.toMillis === 'function' ? ts.toMillis() : new Date(ts).getTime();
-                const date = new Date(ms);
-                const monthsAgo = (new Date().getFullYear() - date.getFullYear()) * 12 + new Date().getMonth() - date.getMonth();
-                if (monthsAgo >= 0 && monthsAgo <= 5) {
-                    months[5 - monthsAgo].submitted++;
-                    if (c.status === 'RESOLVED') months[5 - monthsAgo].resolved++;
-                }
-            } catch { /* skip */ }
-        });
-        return months;
-    }, [complaints]);
-
     // CSV Export
     const handleExportCSV = () => {
         const headers = ['ID', 'Status', 'Priority', 'Category', 'Zone/Area', 'Description', 'Location', 'Created At', 'Resolved At'];
@@ -392,10 +258,6 @@ const ReportsTab: React.FC = () => {
         a.download = `complaints_${selectedPeriod.label.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-    };
-
-    const handlePrint = () => {
-        window.print();
     };
 
     return (
@@ -442,14 +304,6 @@ const ReportsTab: React.FC = () => {
                         {!loading && periodComplaints.length > 0 && (
                             <span className="bg-emerald-500 text-white text-xs px-1.5 py-0.5 rounded-full">{periodComplaints.length}</span>
                         )}
-                    </button>
-
-                    <button
-                        onClick={handlePrint}
-                        className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 bg-white shadow-sm transition-colors"
-                    >
-                        <Printer className="w-4 h-4" />
-                        <span className="text-sm">Print</span>
                     </button>
                 </div>
             </div>
@@ -604,62 +458,6 @@ const ReportsTab: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
-
-            {/* 6-Month Trend */}
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-2 mb-5">
-                    <TrendingUp className="w-5 h-5 text-purple-500" />
-                    <h3 className="text-lg font-bold text-gray-900">6-Month Complaint Trend</h3>
-                </div>
-                {loading ? (
-                    <div className="flex items-center justify-center h-44"><Loader2 className="w-8 h-8 animate-spin text-gray-300" /></div>
-                ) : (
-                    <LineChart data={monthlyData} />
-                )}
-            </div>
-
-            {/* Worker Performance Rankings */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                    <div className="flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-amber-500" />
-                        <h3 className="text-lg font-bold text-gray-900">Worker Performance Rankings</h3>
-                    </div>
-                    {workerPerfLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-                </div>
-                {!workerPerfLoading && workerPerf.length === 0 ? (
-                    <div className="p-10 text-center text-gray-400">
-                        <Trophy className="w-10 h-10 mx-auto mb-2 text-gray-200" />
-                        <p className="text-sm">No completed tasks yet</p>
-                    </div>
-                ) : (
-                    <div className="divide-y divide-gray-100">
-                        {workerPerf.map((w, i) => (
-                            <div key={w.workerId} className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 transition-colors">
-                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                                    i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-gray-100 text-gray-600' : i === 2 ? 'bg-orange-100 text-orange-600' : 'bg-gray-50 text-gray-500'
-                                }`}>{i + 1}</span>
-                                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center font-bold text-emerald-700 text-sm flex-shrink-0">
-                                    {w.name.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-gray-900 text-sm truncate">{w.name}</p>
-                                    <div className="flex items-center gap-1 mt-0.5">
-                                        {[1, 2, 3, 4, 5].map(s => (
-                                            <Star key={s} className={`w-3 h-3 ${s <= Math.round(w.avgRating) ? 'text-amber-400 fill-amber-400' : 'text-gray-200'}`} />
-                                        ))}
-                                        {w.avgRating > 0 && <span className="text-xs text-gray-400 ml-1">{w.avgRating.toFixed(1)}</span>}
-                                    </div>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                    <p className="font-bold text-gray-900">{w.tasksCompleted}</p>
-                                    <p className="text-xs text-gray-400">tasks</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
         </div>
     );

@@ -5,7 +5,6 @@ import './index.css'
 import { LanguageProvider } from './contexts/LanguageContext.tsx'
 import './i18n'; // Import i18n configuration
 import { AuthProvider } from './contexts/AuthContext';
-import { NotificationProvider } from './contexts/NotificationContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import { registerSW } from 'virtual:pwa-register';
@@ -27,11 +26,9 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <LanguageProvider>
         <AuthProvider>
-          <NotificationProvider>
-            <ToastProvider>
-              <App />
-            </ToastProvider>
-          </NotificationProvider>
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </AuthProvider>
       </LanguageProvider>
     </ErrorBoundary>

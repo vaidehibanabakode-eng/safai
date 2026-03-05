@@ -4,7 +4,6 @@ import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
-import { useAuth } from '../../../contexts/AuthContext';
 
 interface SystemStats {
     totalComplaints: number;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { requestAndSaveFCMToken } from '../lib/fcm';
 import { normalizeRoleForStorage } from '../lib/roles';
@@ -29,6 +29,7 @@ interface AuthContextType {
     currentUser: FirebaseUser | null;
     userProfile: UserProfile | null;
     loading: boolean;
+    noDocument: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [noDocument, setNoDocument] = useState(false);
 
     useEffect(() => {
         let unsubscribeProfile: (() => void) | null = null;
@@ -78,66 +80,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (user) {
                 // Set initial loading state for profile
                 setLoading(true);
-
-                // Request FCM token once per session (silently — never blocks auth flow)
-                requestAndSaveFCMToken(user.uid).catch(console.warn);
+                setNoDocument(false);
 
                 // Start listening to the user profile document
                 const docRef = doc(db, 'users', user.uid);
                 unsubscribeProfile = onSnapshot(docRef,
                     (docSnap: any) => {
-                        // ── No Firestore document → auto-create a default Citizen profile ─
-                        if (!docSnap.exists()) {
-                            // Use async IIFE to allow await inside the sync callback
-                            (async () => {
-                                const email = user.email || '';
-                                // Check if a Superadmin pre-created an admin invitation for this email
-                                const pending = email ? await getPendingAdminData(email) : null;
-
-                                const newProfile: Record<string, any> = pending
-                                    ? {
-                                        uid: user.uid,
-                                        email: email,
-                                        name: pending.name || user.displayName || (email.split('@')[0] ?? 'User'),
-                                        role: pending.role || 'Admin',
-                                        assignedZone: pending.assignedZone || '',
-                                        adminLevel: pending.adminLevel || 'Zone Admin',
-                                        status: pending.status || 'Active',
-                                        createdAt: serverTimestamp(),
-                                    }
-                                    : {
-                                        uid: user.uid,
-                                        email: email,
-                                        name: user.displayName || (email.split('@')[0] ?? 'User'),
-                                        role: 'Citizen',
-                                        createdAt: serverTimestamp(),
-                                        rewardPoints: 0,
-                                        citizenID: `CIT-${user.uid.slice(-6).toUpperCase()}`,
-                                    };
-
-                                setDoc(docRef, newProfile)
-                                    .then(async () => {
-                                        // Clean up the pending_admins record after consuming it
-                                        if (pending && email) {
-                                            const emailKey = email.toLowerCase()
-                                                .replace(/\./g, '_')
-                                                .replace(/@/g, '__at__');
-                                            deleteDoc(doc(db, 'pending_admins', emailKey)).catch(() => {});
-                                        }
-                                    })
-                                    .catch((err: unknown) => {
-                                        console.error('[AuthContext] Auto-create profile failed:', err);
-                                        setUserProfile({
-                                            uid: user.uid,
-                                            email: email,
-                                            name: user.displayName || (email.split('@')[0] ?? 'User'),
-                                            role: 'Citizen',
-                                        });
-                                        setLoading(false);
-                                    });
-                            })();
-                            // Keep loading=true — the next onSnapshot event will resolve everything
-                            return;
+                        let firestoreData: any = null;
+                        if (docSnap.exists()) {
+                            firestoreData = docSnap.data();
+                            setNoDocument(false);
+                            console.log('✅ User document found in Firestore:', { uid: user.uid, data: firestoreData });
+                        } else {
+                            console.error('❌ NO USER DOCUMENT in Firestore for:', user.uid, user.email);
+                            console.error('   This user needs to sign up again or have their document created.');
+                            setNoDocument(true);
                         }
 
                         const firestoreData = docSnap.data();
@@ -172,20 +129,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         });
                         setLoading(false);
                     },
-                    (error: unknown) => {
-                        console.error("[AuthContext] Firestore profile read error:", error);
-                        // Treat as a fresh user — set a minimal Citizen profile so the app loads
+                    (error: any) => {
+                        console.error("Error listening to user profile:", error);
+                        // Fallback - use lowercase for consistency
                         setUserProfile({
                             uid: user.uid,
                             email: user.email || '',
-                            name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
-                            role: 'Citizen',
+                            name: user.displayName || 'User',
+                            role: 'citizen',
                         });
                         setLoading(false);
                     }
                 );
             } else {
                 setUserProfile(null);
+                setNoDocument(false);
                 setLoading(false);
             }
         });
@@ -200,6 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         userProfile,
         loading,
+        noDocument,
     };
 
     return (

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LogIn, ArrowLeft, ShieldCheck, Mail, Lock, Zap } from 'lucide-react';
 import { User } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import LanguageSwitcher from './common/LanguageSwitcher';
 
@@ -18,28 +18,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useLanguage();
-
-  // Handle the result when Google redirects back to the app
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          // AuthContext onAuthStateChanged handles profile loading automatically
-          onLogin({
-            id: result.user.uid,
-            email: result.user.email || '',
-            name: result.user.displayName || 'User',
-            role: 'citizen',
-          });
-        }
-      })
-      .catch((err: any) => {
-        if (err.code && err.code !== 'auth/no-current-user') {
-          console.error('Google Redirect Result Error:', err);
-          setError(`Google sign-in failed (${err.code}). Please try again.`);
-        }
-      });
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,13 +53,58 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
     setError('');
     setIsLoading(true);
     try {
-      // signInWithRedirect is more reliable than signInWithPopup for PWA/mobile.
-      // The result is handled in the useEffect above via getRedirectResult.
-      await signInWithRedirect(auth, googleProvider);
-      // Page navigates away — code below does not run
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      const user = userCredential.user;
+
+      // Check if profile exists, if not create default one
+      const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+
+      // Only create profile if it doesn't exist
+      // If user previously signed up, keep their existing role
+      if (!docSnap.exists()) {
+        console.log('📝 Google Login: Creating new user with citizen role');
+        await setDoc(docRef, {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || 'Google User',
+          role: 'citizen',  // lowercase for consistent comparison
+          createdAt: serverTimestamp(),
+          rewardPoints: 0,
+          phone: '',
+          address: '',
+          citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+          assignedZone: '',
+          memberSince: serverTimestamp(),
+          preferences: {
+            notifications: true,
+            language: 'en'
+          }
+        });
+      } else {
+        // Profile exists - just update name and email if needed
+        const existingData = docSnap.data();
+        if (existingData.name !== (user.displayName || 'Google User')) {
+          await setDoc(docRef, {
+            ...existingData,
+            name: user.displayName || 'Google User'
+          }, { merge: true });
+        }
+      }
+
+      onLogin({
+        id: user.uid,
+        email: user.email || '',
+        name: user.displayName || 'User',
+        role: 'citizen'
+      });
     } catch (err: any) {
       console.error('Google Login Error:', err);
-      setError(`Google sign-in failed (${err.code || 'unknown'}). Please try again.`);
+      setError('Failed to log in with Google. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -240,7 +263,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
                 <button
                   key={d.role}
                   type="button"
-                  onClick={() => { setEmail(d.email); setPassword('Demo1234!'); }}
+                  onClick={() => { setEmail(d.email); setPassword('Demo@1234'); }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${d.cls}`}
                 >
                   <span>{d.icon}</span>
@@ -249,7 +272,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
               ))}
             </div>
             <p className="text-[10px] text-amber-500 mt-2 text-center">
-              Password: <code className="bg-amber-100 px-1 rounded font-mono">Demo1234!</code> · Run <code className="bg-amber-100 px-1 rounded font-mono">npx tsx scripts/seed-demo.ts</code> to seed
+              Password: <code className="bg-amber-100 px-1 rounded font-mono">Demo@1234</code> · Set up these accounts in Firebase first
             </p>
           </div>
 
