@@ -3,6 +3,7 @@ import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { requestAndSaveFCMToken } from '../lib/fcm';
+import { normalizeRoleForStorage } from '../lib/roles';
 
 // Extended user profile stored in Firestore
 export interface UserProfile {
@@ -40,18 +41,7 @@ export const useAuth = () => {
     return context;
 };
 
-// Role normalization — see src/lib/roles.ts for the authoritative mapping.
-// Keep this map in sync with ROUTING_ROLE_MAP in roles.ts.
-// Maps every known role format → canonical Firestore-cased value used by App.tsx routing
-const ROLE_NORMALIZATION: Record<string, string> = {
-    'superadmin':    'Superadmin',
-    'super_admin':   'Superadmin',   // legacy setSuperAdmin.cjs format
-    'admin':         'Admin',
-    'worker':        'Worker',
-    'citizen':       'Citizen',
-    'green-champion':'Green-Champion',
-    'green_champion':'Green-Champion',
-};
+// Role normalization is handled by normalizeRoleForStorage() from src/lib/roles.ts.
 
 // ── Pending admin lookup ──────────────────────────────────────────────────────
 // Returns the pending_admins doc data if a Superadmin pre-created an invite for this email.
@@ -155,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         // ── Normalize role — handle all known formats ─────────────────
                         // e.g. 'Admin', 'SUPER_ADMIN', 'green-champion', 'worker' all work
                         const rawRole = String(firestoreData?.role || '').toLowerCase();
-                        const resolvedRole = ROLE_NORMALIZATION[rawRole] || 'Citizen';
+                        const resolvedRole = normalizeRoleForStorage(rawRole);
 
                         // Dev-mode visibility: log role resolution so routing bugs are obvious
                         if (import.meta.env.DEV) {

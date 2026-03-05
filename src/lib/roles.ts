@@ -13,6 +13,8 @@ const STORAGE_ROLE_MAP: Record<string, string> = {
   worker: 'Worker',
   admin: 'Admin',
   superadmin: 'Superadmin',
+  SUPER_ADMIN: 'Superadmin',
+  super_admin: 'Superadmin',
   'green-champion': 'Green-Champion',
   'green_champion': 'Green-Champion',
   // already-capitalized forms pass through
