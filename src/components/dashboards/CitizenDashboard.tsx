@@ -165,6 +165,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
       fetched.sort((a, b) => (b.date?.toMillis() || 0) - (a.date?.toMillis() || 0));
       setMyComplaints(fetched);
       setLoadingComplaints(false);
+    }, () => {
+      setLoadingComplaints(false);
     });
     return () => unsubscribe();
   }, [user]);
