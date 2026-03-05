@@ -57,7 +57,7 @@ export const TRAINING_MODULES: Record<string, TrainingModule[]> = {
           type: 'video-lecture',
           question: 'Watch this guide on proper waste segregation',
           videoTitle: 'Waste Segregation Guide',
-          videoUrl: 'Y2W0jPg2JBk',
+          videoUrl: 'CZBT2aUGlNs',
           points: 50,
           explanation: 'Visual learning helps reinforce proper sorting habits.'
         },
