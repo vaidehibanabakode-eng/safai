@@ -10,6 +10,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuth } from './contexts/AuthContext';
 import { auth } from './lib/firebase';
 import { signOut } from 'firebase/auth';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 export type UserRole = 'superadmin' | 'admin' | 'green-champion' | 'worker' | 'citizen';
 
@@ -200,6 +201,7 @@ function App() {
           {renderDashboard()}
         </div>
       </div>
+      <SpeedInsights />
     </ThemeProvider>
   );
 }
