@@ -28,7 +28,7 @@ interface SettingsTabProps {
 }
 
 const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
-    const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
+    const { success: toastSuccess, error: toastError } = useToast();
     const [emailNotif, setEmailNotif] = useState(user?.preferences?.notifications ?? true);
     const [pushNotif, setPushNotif] = useState(user?.preferences?.notifications ?? true);
     const [smsNotif, setSmsNotif] = useState(false);

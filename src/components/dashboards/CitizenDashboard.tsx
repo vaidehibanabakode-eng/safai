@@ -40,30 +40,6 @@ import StatCard from '../common/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useSpeechToText } from '../../hooks/useSpeechToText';
 import { useAuth } from '../../contexts/AuthContext';
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB — guard against storage/retry-limit-exceeded on mobile
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-
-const uploadWithRetry = async (
-  fileRef: ReturnType<typeof ref>,
-  file: File,
-  maxAttempts = 3
-): Promise<string> => {
-  let uploaded = false;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      if (!uploaded) {
-        await uploadBytes(fileRef, file);
-        uploaded = true;
-      }
-      return await getDownloadURL(fileRef);
-    } catch (err: any) {
-      if (attempt === maxAttempts) throw err;
-      await sleep(2000 * attempt); // 2s, 4s backoff
-    }
-  }
-  throw new Error('Upload failed after retries');
-};
 
 
 interface CitizenDashboardProps {
@@ -130,19 +106,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [submitError, setSubmitError] = useState('');
   const { t, language } = useLanguage();
-  const { isListening, startStop: toggleMic, error: speechError } = useSpeechToText(
+  const { isListening, startStop: toggleMic } = useSpeechToText(
     language,
     (transcript) => setDescription((prev) => prev ? `${prev} ${transcript}` : transcript),
   );
-
-  // AI photo analysis (vision-based)
-  const [photoAiSuggestion, setPhotoAiSuggestion] = useState<{
-    category: string;
-    severity: string;
-    description: string;
-    confidence: number;
-  } | null>(null);
-  const [photoAiLoading, setPhotoAiLoading] = useState(false);
 
   interface Complaint {
     id: string;

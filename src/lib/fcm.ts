@@ -1,12 +1,13 @@
 import { getToken, onMessage } from 'firebase/messaging';
 import { doc, updateDoc } from 'firebase/firestore';
-import { messaging, db } from './firebase';
+import { getMessagingInstance, db } from './firebase';
 
 /**
  * Request browser notification permission, get FCM token, save to Firestore.
  * Call once per login session.
  */
 export async function requestAndSaveFCMToken(userId: string): Promise<string | null> {
+  const messaging = await getMessagingInstance();
   if (!messaging) return null;
 
   try {
@@ -41,17 +42,20 @@ export async function requestAndSaveFCMToken(userId: string): Promise<string | n
 export function setupForegroundMessageListener(
   onNotification: (title: string, body: string) => void
 ): () => void {
-  if (!messaging) return () => {};
-  try {
-    return onMessage(messaging, payload => {
-      const title = payload.notification?.title ?? 'Safai Connect';
-      const body = payload.notification?.body ?? '';
-      onNotification(title, body);
-    });
-  } catch (err) {
-    console.warn('[FCM] Foreground listener failed:', err);
-    return () => {};
-  }
+  // Kick off async init; attach listener once ready
+  getMessagingInstance().then(messaging => {
+    if (!messaging) return;
+    try {
+      onMessage(messaging, payload => {
+        const title = payload.notification?.title ?? 'Safai Connect';
+        const body = payload.notification?.body ?? '';
+        onNotification(title, body);
+      });
+    } catch (err) {
+      console.warn('[FCM] Foreground listener failed:', err);
+    }
+  });
+  return () => {};
 }
 
 /**

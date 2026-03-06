@@ -4,9 +4,11 @@ import {
     Trash2, Eye, UserPlus, X, Loader2
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { collection, query, onSnapshot, doc, updateDoc, getDocs, where, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, getDocs, getDoc, where, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useToast } from '../../../contexts/ToastContext';
+import { useNotifications } from '../../../contexts/NotificationContext';
+import { sendPushNotification } from '../../../lib/fcm';
 
 interface Complaint {
     id: string;
@@ -39,6 +41,7 @@ interface Evidence {
 
 const ComplaintsTab: React.FC = () => {
     const { error: toastError } = useToast();
+    const { addNotification } = useNotifications();
     const [complaints, setComplaints] = useState<Complaint[]>([]);
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [loading, setLoading] = useState(true);

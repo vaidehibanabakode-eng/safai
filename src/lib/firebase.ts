@@ -4,6 +4,7 @@ import { getAnalytics } from "firebase/analytics";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getMessaging, isSupported, Messaging } from 'firebase/messaging';
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -24,3 +25,24 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Messaging – only works in browsers that support it (lazy-initialized)
+let _messaging: Messaging | null = null;
+let _messagingReady: Promise<Messaging | null> | null = null;
+
+function getMessagingInstance(): Promise<Messaging | null> {
+    if (!_messagingReady) {
+        _messagingReady = isSupported()
+            .then(yes => {
+                if (yes) {
+                    _messaging = getMessaging(app);
+                    return _messaging;
+                }
+                return null;
+            })
+            .catch(() => null);
+    }
+    return _messagingReady;
+}
+
+export { getMessagingInstance };

@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { requestAndSaveFCMToken } from '../lib/fcm';
 import { normalizeRoleForStorage } from '../lib/roles';
 
 // Extended user profile stored in Firestore
@@ -43,21 +42,6 @@ export const useAuth = () => {
 };
 
 // Role normalization is handled by normalizeRoleForStorage() from src/lib/roles.ts.
-
-// ── Pending admin lookup ──────────────────────────────────────────────────────
-// Returns the pending_admins doc data if a Superadmin pre-created an invite for this email.
-const getPendingAdminData = async (email: string): Promise<Record<string, any> | null> => {
-    const emailKey = email.toLowerCase()
-        .replace(/\./g, '_')
-        .replace(/@/g, '__at__');
-    try {
-        const snap = await getDoc(doc(db, 'pending_admins', emailKey));
-        if (snap.exists()) return snap.data();
-    } catch {
-        // Firestore read failure (e.g. network) — fall through to default Citizen
-    }
-    return null;
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
