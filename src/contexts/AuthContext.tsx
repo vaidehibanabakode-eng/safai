@@ -97,8 +97,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             setNoDocument(true);
                         }
 
-                        const firestoreData = docSnap.data();
-
                         // ── Normalize role — handle all known formats ─────────────────
                         // e.g. 'Admin', 'SUPER_ADMIN', 'green-champion', 'worker' all work
                         const rawRole = String(firestoreData?.role || '').toLowerCase();

@@ -121,7 +121,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
   const { userProfile } = useAuth();
   const { error: toastError, warning: toastWarning, info: toastInfo, success: toastSuccess } = useToast();
   const [activeTab, setActiveTab] = useState('home'); // Changed default to 'home' to match new key
-  const [isListening, setIsListening] = useState(false);
   const [description, setDescription] = useState('');
   const [issueType, setIssueType] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -130,7 +129,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
   const DRAFT_KEY = `draft_complaint_${user?.id}`;
   const [submitSuccess, setSubmitSuccess] = useState('');
   const [submitError, setSubmitError] = useState('');
-  const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const { t, language } = useLanguage();
   const { isListening, startStop: toggleMic, error: speechError } = useSpeechToText(
     language,
@@ -437,43 +435,6 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
     } finally {
       setLocationLoading(false);
     }
-  };
-
-  // ----------- Voice – Microphone for Report Issue -----------
-  const toggleMic = () => {
-    const SpeechRecognitionAPI =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognitionAPI) {
-      toastInfo('Speech recognition is not supported in this browser. Please use Chrome.');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
-    const recognition = new SpeechRecognitionAPI();
-    recognition.lang =
-      language === 'ur' ? 'ur-PK' : language === 'sd' ? 'sd' : 'en-US';
-    recognition.interimResults = true;
-    recognition.continuous = false;
-
-    recognition.onresult = (event: ISpeechRecognitionEvent) => {
-      const transcript = event.results
-        .map((r) => r[0].transcript)
-        .join('');
-      setDescription(transcript);
-    };
-
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
   };
 
   // ----------- Voice – Read Aloud for Dashboard summary -----------
