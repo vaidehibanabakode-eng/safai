@@ -157,6 +157,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                     {/* Logo */}
                     <div onClick={() => scrollTo('hero')} className="flex items-center gap-2.5 cursor-pointer group">
                         <img src="/logo.png" alt="Safai Connect Logo" className="h-10 w-auto object-contain group-hover:scale-105 transition-transform" />
+                        
                     </div>
 
                     {/* Desktop links */}
@@ -182,7 +183,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                         </button>
                         <button
                             onClick={onGetStarted}
-                            className="px-5 py-2.5 text-sm font-bold text-white bg-gray-900 hover:bg-gray-800 rounded-full transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-1.5"
+                            className="px-5 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full transition-all shadow-md shadow-emerald-600/20 hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-1.5"
                         >
                             {t('nav_get_started')} <ArrowRight className="w-4 h-4" />
                         </button>
@@ -218,29 +219,34 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
             {/* ─── HERO ─── */}
             <section id="hero" className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 overflow-hidden pt-20">
-                {/* Background Blobs (Light Mode) */}
+                {/* Background layers */}
                 <div className="absolute inset-0 z-0 overflow-hidden">
-                    <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-emerald-100/40 rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
-                    <div className="absolute top-[20%] left-[-10%] w-[600px] h-[600px] bg-teal-100/40 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
-                    <div className="absolute bottom-[-10%] left-[20%] w-[600px] h-[600px] bg-cyan-100/40 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000" />
+                    <div className="absolute inset-0 dot-grid opacity-[0.35]" />
+                    <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-emerald-200/50 rounded-full mix-blend-multiply filter blur-3xl animate-blob" />
+                    <div className="absolute top-[20%] left-[-10%] w-[500px] h-[500px] bg-teal-200/40 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
+                    <div className="absolute bottom-[-10%] left-[30%] w-[500px] h-[500px] bg-cyan-200/40 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000" />
+                    <div className="absolute top-[40%] right-[10%] w-[300px] h-[300px] bg-emerald-100/30 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000" />
                 </div>
 
                 <div className="relative z-10 max-w-5xl mx-auto">
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-100 bg-white shadow-sm mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-emerald-200/60 bg-white/70 backdrop-blur-md shadow-lg shadow-emerald-100/40 mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                        </span>
                         <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">{t('hero_badge')}</span>
                     </div>
 
                     {/* Headline */}
-                    <h1 className="text-5xl sm:text-6xl md:text-8xl font-black tracking-tight leading-[1.05] mb-6 text-gray-900 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+                    <h1 className="text-5xl sm:text-6xl md:text-[5.5rem] font-black tracking-tight leading-[1.08] mb-8 text-gray-900 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
                         {t('hero_title_1')}<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500 drop-shadow-sm">
                             {t('hero_title_2')}
                         </span>
                     </h1>
 
-                    <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+                    <p className="text-lg sm:text-xl text-gray-500 mb-12 max-w-2xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
                         {t('hero_subtitle')}
                     </p>
 
@@ -248,55 +254,64 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-in fade-in zoom-in duration-700 delay-300">
                         <button
                             onClick={onGetStarted}
-                            className="w-full sm:w-auto px-8 py-4 bg-emerald-600 text-white rounded-full font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:scale-105 flex items-center justify-center gap-2"
+                            className="w-full sm:w-auto px-10 py-4 bg-emerald-600 text-white rounded-full font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/25 hover:shadow-2xl hover:shadow-emerald-600/30 hover:scale-105 flex items-center justify-center gap-2.5 animate-glow"
                         >
                             {t('hero_get_started_btn')} <ArrowRight className="w-5 h-5" />
                         </button>
                         <button
                             onClick={handleInstall}
-                            className="w-full sm:w-auto px-8 py-4 bg-white text-emerald-700 border-2 border-emerald-100 rounded-full font-bold text-lg hover:border-emerald-200 hover:bg-emerald-50 transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                            className="w-full sm:w-auto px-10 py-4 bg-white/80 backdrop-blur-sm text-emerald-700 border-2 border-emerald-100 rounded-full font-bold text-lg hover:border-emerald-300 hover:bg-white transition-all flex items-center justify-center gap-2.5 shadow-sm hover:shadow-lg"
                         >
                             <Download className="w-5 h-5" /> {t('hero_install_btn')}
                         </button>
                     </div>
 
                     {/* Trusted by */}
-                    <div className="mt-16 flex flex-wrap items-center justify-center gap-6 opacity-60 animate-in fade-in duration-700 delay-500">
-                        {['Indore', 'Surat', 'Navi Mumbai', 'Delhi', 'Bangalore'].map((city) => (
-                            <div key={city} className="flex items-center gap-1.5 text-sm font-medium text-gray-500">
-                                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                                {city}
-                            </div>
-                        ))}
+                    <div className="mt-16 animate-in fade-in duration-700 delay-500">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Trusted across India</p>
+                        <div className="flex flex-wrap items-center justify-center gap-3">
+                            {['Indore', 'Surat', 'Navi Mumbai', 'Delhi', 'Bangalore'].map((city) => (
+                                <div key={city} className="flex items-center gap-1.5 px-4 py-1.5 bg-white/70 backdrop-blur-sm border border-gray-200/60 rounded-full shadow-sm text-sm font-medium text-gray-600 hover:border-emerald-200 hover:text-emerald-700 transition-all cursor-default">
+                                    <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                                    {city}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
                 {/* Scroll indicator */}
                 <button
                     onClick={() => scrollTo('impact')}
-                    className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-gray-400 hover:text-emerald-600 transition-colors animate-bounce"
+                    className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-gray-400 hover:text-emerald-600 transition-colors"
                 >
-                    <span className="text-xs font-medium">{t('hero_scroll')}</span>
-                    <ChevronDown className="w-5 h-5" />
+                    <span className="text-xs font-semibold tracking-wide">{t('hero_scroll')}</span>
+                    <ChevronDown className="w-5 h-5 animate-bounce" />
                 </button>
             </section>
 
             {/* ─── STATS ─── */}
-            <section id="impact" className="py-20 bg-white border-y border-gray-100">
+            <section id="impact" className="py-24 bg-white border-y border-gray-100">
                 <div ref={statsRef} className="container mx-auto px-4 md:px-8">
+                    <div className="text-center mb-12">
+                        <p className="text-emerald-600 text-sm font-bold uppercase tracking-widest mb-3">{t('stat_citizens').includes('Citizens') ? 'Real Impact' : 'Impact'}</p>
+                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Numbers That Matter</h2>
+                        <p className="text-gray-500 max-w-lg mx-auto">Measurable impact across cities, communities, and clean environments.</p>
+                    </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                         {stats.map((stat, i) => (
                             <div
                                 key={i}
-                                className="group p-6 rounded-3xl bg-gray-50 border border-transparent hover:border-gray-100 hover:bg-white hover:shadow-xl transition-all duration-300"
+                                className="group relative p-6 md:p-8 rounded-3xl bg-gradient-to-br from-white to-gray-50 border border-gray-100 hover:border-gray-200 hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 overflow-hidden"
                             >
-                                <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-current to-transparent opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: stat.color.replace('text-', '').includes('emerald') ? '#10b981' : stat.color.replace('text-', '').includes('blue') ? '#3b82f6' : stat.color.replace('text-', '').includes('purple') ? '#8b5cf6' : '#f97316' }} />
+                                <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
                                     <stat.icon className="w-6 h-6" />
                                 </div>
-                                <div className="text-3xl md:text-4xl font-bold text-gray-900 mb-1">
-                                    {stat.value}<span className={`text-xl ${stat.color}`}>{stat.suffix}</span>
+                                <div className="text-3xl md:text-4xl font-black text-gray-900 mb-1 tabular-nums">
+                                    {stat.value}<span className={`text-xl font-bold ${stat.color}`}>{stat.suffix}</span>
                                 </div>
-                                <div className="text-sm font-medium text-gray-500">{stat.label}</div>
+                                <div className="text-sm font-semibold text-gray-500">{stat.label}</div>
                             </div>
                         ))}
                     </div>
@@ -313,29 +328,42 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {roles.map((card) => (
-                            <div
-                                key={card.role}
-                                className={`${card.bg} border ${card.border} rounded-[2rem] p-8 shadow-sm hover:shadow-xl transition-all duration-300 group hover:-translate-y-1`}
-                            >
-                                <div className="text-4xl mb-6">{card.emoji}</div>
-                                <h3 className={`text-2xl font-bold mb-4 ${card.accent}`}>{card.role}</h3>
-                                <ul className="space-y-3 mb-8">
-                                    {card.perks.map((p) => (
-                                        <li key={p} className="flex items-start gap-3 text-gray-600 text-sm font-medium">
-                                            <CheckCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${card.accent}`} />
-                                            {p}
-                                        </li>
-                                    ))}
-                                </ul>
-                                <button
-                                    onClick={onGetStarted}
-                                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm ${card.btnClass} transition-all`}
+                        {roles.map((card, idx) => {
+                            const gradients = [
+                                'from-blue-500 to-blue-600',
+                                'from-emerald-500 to-emerald-600',
+                                'from-purple-500 to-purple-600',
+                                'from-amber-500 to-amber-600',
+                            ];
+                            return (
+                                <div
+                                    key={card.role}
+                                    className={`${card.bg} border ${card.border} rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 group hover:-translate-y-1.5`}
                                 >
-                                    {t('access_dashboard')} <ArrowRight className="w-4 h-4" />
-                                </button>
-                            </div>
-                        ))}
+                                    <div className={`h-1.5 bg-gradient-to-r ${gradients[idx]}`} />
+                                    <div className="p-8">
+                                        <div className="flex items-center gap-4 mb-6">
+                                            <div className="text-4xl">{card.emoji}</div>
+                                            <h3 className={`text-2xl font-bold ${card.accent}`}>{card.role}</h3>
+                                        </div>
+                                        <ul className="space-y-3 mb-8">
+                                            {card.perks.map((p) => (
+                                                <li key={p} className="flex items-start gap-3 text-gray-600 text-sm font-medium">
+                                                    <CheckCircle className={`w-5 h-5 mt-0.5 flex-shrink-0 ${card.accent}`} />
+                                                    {p}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <button
+                                            onClick={onGetStarted}
+                                            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm ${card.btnClass} transition-all group-hover:gap-3`}
+                                        >
+                                            {t('access_dashboard')} <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </section>
@@ -350,16 +378,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {features.map((f) => (
+                        {features.map((f, idx) => (
                             <div
                                 key={f.title}
-                                className="bg-gray-50 hover:bg-white border border-transparent hover:border-gray-200 hover:shadow-xl rounded-[2rem] p-8 transition-all duration-300 group hover:-translate-y-1"
+                                className="relative bg-gray-50 hover:bg-white border border-transparent hover:border-gray-200 hover:shadow-2xl rounded-[2rem] p-8 transition-all duration-500 group hover:-translate-y-1.5 overflow-hidden"
                             >
-                                <div className={`w-14 h-14 ${f.bg} rounded-2xl flex items-center justify-center mb-6 group-hover:rotate-6 transition-transform`}>
+                                <div className="absolute top-6 right-6 text-[4rem] font-black text-gray-100 group-hover:text-emerald-50 transition-colors select-none leading-none">
+                                    {String(idx + 1).padStart(2, '0')}
+                                </div>
+                                <div className={`relative w-14 h-14 ${f.bg} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
                                     <f.icon className={`w-7 h-7 ${f.color}`} />
                                 </div>
-                                <h4 className="text-gray-900 font-bold text-xl mb-3">{f.title}</h4>
-                                <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+                                <h4 className="relative text-gray-900 font-bold text-xl mb-3">{f.title}</h4>
+                                <p className="relative text-gray-500 text-sm leading-relaxed">{f.desc}</p>
                             </div>
                         ))}
                     </div>
@@ -376,10 +407,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                     </div>
 
                     {/* Mission */}
-                    <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-gray-100 mb-12">
+                    <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-3xl p-8 md:p-12 shadow-sm border border-emerald-100/50 mb-12">
                         <div className="flex flex-col md:flex-row gap-8 items-center">
                             <div className="flex-shrink-0">
-                                <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center">
+                                <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-sm border border-emerald-100">
                                     <Target className="w-10 h-10 text-emerald-600" />
                                 </div>
                             </div>
@@ -457,7 +488,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                         </div>
 
                         {/* Contact Form */}
-                        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); toastSuccess(t('contact_sent_success')); }}>
+                        <form className="bg-gray-50 rounded-3xl border border-gray-100 p-8 space-y-4" onSubmit={(e) => { e.preventDefault(); toastSuccess(t('contact_sent_success')); }}>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <input
                                     type="text"
@@ -485,7 +516,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                             />
                             <button
                                 type="submit"
-                                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+                                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:-translate-y-0.5"
                             >
                                 <Send className="w-5 h-5" />
                                 {t('contact_send_btn')}
@@ -497,29 +528,34 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
             {/* ─── CTA ─── */}
             <section id="cta" className="py-32 px-4 relative overflow-hidden bg-gray-900">
-                <div className="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')] bg-cover bg-center mix-blend-overlay"></div>
+                <div className="absolute inset-0">
+                    <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-emerald-950 to-gray-900" />
+                    <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-emerald-600/10 rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-teal-600/10 rounded-full blur-3xl" />
+                    <div className="absolute inset-0 dot-grid opacity-[0.04]" />
+                </div>
                 <div className="container mx-auto md:px-8 relative z-10 text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 mb-8 backdrop-blur-md">
+                    <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 mb-8 backdrop-blur-md">
                         <Zap className="w-4 h-4 text-emerald-400" />
                         <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest">{t('cta_badge')}</span>
                     </div>
                     <h2 className="text-5xl md:text-6xl font-black text-white mb-6 tracking-tight">
                         {t('cta_title_1')}<br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">{t('cta_title_2')}</span>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">{t('cta_title_2')}</span>
                     </h2>
-                    <p className="text-xl text-gray-400 mb-10 max-w-xl mx-auto">
+                    <p className="text-xl text-gray-400 mb-12 max-w-xl mx-auto">
                         {t('cta_subtitle')}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <button
                             onClick={onGetStarted}
-                            className="px-10 py-5 bg-emerald-500 text-white rounded-full font-bold text-xl hover:bg-emerald-400 transition-all shadow-2xl hover:scale-105 flex items-center justify-center gap-2"
+                            className="px-10 py-5 bg-emerald-500 text-white rounded-full font-bold text-xl hover:bg-emerald-400 transition-all shadow-2xl shadow-emerald-500/25 hover:shadow-emerald-400/30 hover:scale-105 flex items-center justify-center gap-2.5"
                         >
                             {t('cta_get_started')} <ArrowRight className="w-6 h-6" />
                         </button>
                         <button
                             onClick={handleInstall}
-                            className="px-10 py-5 bg-white/10 text-white border border-white/20 rounded-full font-bold text-xl hover:bg-white/20 transition-all flex items-center justify-center gap-2 backdrop-blur-sm"
+                            className="px-10 py-5 bg-white/10 text-white border border-white/20 rounded-full font-bold text-xl hover:bg-white/20 transition-all flex items-center justify-center gap-2.5 backdrop-blur-sm"
                         >
                             <Download className="w-6 h-6 text-emerald-400" /> {t('hero_install_btn')}
                         </button>
@@ -528,34 +564,35 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
             </section>
 
             {/* ─── FOOTER ─── */}
-            <footer className="bg-white pt-16 pb-8 px-4 border-t border-gray-100">
+            <footer className="bg-gray-900 pt-20 pb-8 px-4 border-t border-gray-800">
                 <div className="container mx-auto md:px-8">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
                         <div>
-                            <div className="flex items-center gap-2 mb-6 cursor-pointer" onClick={() => scrollTo('hero')}>
+                            <div className="flex items-center gap-3 mb-6 cursor-pointer" onClick={() => scrollTo('hero')}>
                                 <img src="/logo.png" alt="Safai Connect Logo" className="h-10 w-auto object-contain" />
+                                {/* <span className="text-xl font-bold text-white">SafaiConnect</span> */}
                             </div>
-                            <p className="text-gray-500 text-sm leading-relaxed">
+                            <p className="text-gray-400 text-sm leading-relaxed">
                                 {t('footer_tagline')}
                             </p>
                         </div>
                         {footerCols.map((col) => (
                             <div key={col.heading}>
-                                <h4 className="font-bold text-gray-900 mb-6 text-sm uppercase tracking-wider">{col.heading}</h4>
-                                <ul className="space-y-3 text-gray-500 text-sm">
+                                <h4 className="font-bold text-white mb-6 text-sm uppercase tracking-wider">{col.heading}</h4>
+                                <ul className="space-y-3 text-gray-400 text-sm">
                                     {col.links.map((l) => (
-                                        <li key={l} className="hover:text-emerald-600 cursor-pointer transition-colors">{l}</li>
+                                        <li key={l} className="hover:text-emerald-400 cursor-pointer transition-colors">{l}</li>
                                     ))}
                                 </ul>
                             </div>
                         ))}
                     </div>
 
-                    <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-400">
+                    <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-500">
                         <div>© {new Date().getFullYear()} {t('footer_rights')}</div>
                         <div className="flex gap-6">
                             {footerBottomLinks.map((l) => (
-                                <span key={l} className="hover:text-emerald-600 cursor-pointer transition-colors">{l}</span>
+                                <span key={l} className="hover:text-emerald-400 cursor-pointer transition-colors">{l}</span>
                             ))}
                         </div>
                     </div>
