@@ -1,7 +1,7 @@
 import { Page, expect } from '@playwright/test';
 
 /** Password used by seed-demo.ts for all demo accounts */
-export const DEMO_PASSWORD = 'Demo1234!';
+export const DEMO_PASSWORD = 'Demo@1234';
 
 /**
  * Demo credentials — must match scripts/seed-demo.ts.

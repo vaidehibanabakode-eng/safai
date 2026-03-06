@@ -39,7 +39,7 @@ test.describe('Login Page', () => {
     await goToLogin(page);
     await page.locator('.bg-amber-50').locator('button').filter({ hasText: 'Citizen' }).click();
     await expect(page.locator('input[placeholder="Enter your email"]')).toHaveValue('citizen@demo.com');
-    await expect(page.locator('input[placeholder="••••••••"]')).toHaveValue('Demo1234!');
+    await expect(page.locator('input[placeholder="••••••••"]')).toHaveValue('Demo@1234');
   });
 });
 

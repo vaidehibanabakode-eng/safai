@@ -1025,7 +1025,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
         return <RewardsTab complaints={myComplaints} trainingProgress={trainingProgress} />;
       case 'training':
         return <TrainingSystem user={user} />;
-      case 'settings': return <SettingsTab />;
+      case 'settings': return <SettingsTab user={user} />;
       case 'profile':
         return <ProfilePage user={user} />;
 

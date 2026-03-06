@@ -12,7 +12,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [theme, setThemeState] = useState<Theme>(() => {
-        return 'light';
+        const stored = localStorage.getItem('theme') as Theme | null;
+        return stored === 'dark' ? 'dark' : 'light';
     });
 
     useEffect(() => {
@@ -23,13 +24,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [theme]);
 
     const toggleTheme = () => {
-        // Enforce light mode always
-        setThemeState('light');
+        setThemeState(prev => prev === 'light' ? 'dark' : 'light');
     };
 
-    const setTheme = (_newTheme: Theme) => {
-        // Enforce light mode always
-        setThemeState('light');
+    const setTheme = (newTheme: Theme) => {
+        setThemeState(newTheme);
     };
 
     return (

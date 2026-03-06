@@ -13,14 +13,16 @@
  */
 
 import admin from 'firebase-admin';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const serviceAccount = JSON.parse(
-  readFileSync(join(__dirname, 'serviceAccountKey.json'), 'utf-8')
-);
+const serviceAccountPath = existsSync(join(__dirname, 'serviceAccountKey.json'))
+  ? join(__dirname, 'serviceAccountKey.json')
+  : join(__dirname, 'service-account.json');
+
+const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf-8'));
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 
@@ -28,7 +30,7 @@ const db    = admin.firestore();
 db.settings({ ignoreUndefinedProperties: true });
 const fauth = admin.auth();
 
-const DEMO_PASSWORD = 'Demo1234!';
+const DEMO_PASSWORD = 'Demo@1234';
 
 const demoUsers = [
   {
@@ -83,6 +85,12 @@ const demoComplaints = [
 async function getOrCreateAuthUser(email: string, displayName: string): Promise<string> {
   try {
     const existing = await fauth.getUserByEmail(email);
+    // Keep demo accounts deterministic across reruns.
+    await fauth.updateUser(existing.uid, {
+      password: DEMO_PASSWORD,
+      displayName,
+      emailVerified: true,
+    });
     console.log(`  ↳ Auth account found  (uid: ${existing.uid})`);
     return existing.uid;
   } catch (err: any) {

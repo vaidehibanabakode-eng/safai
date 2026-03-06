@@ -45,7 +45,7 @@ const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, onLogou
       case 'training':   return <TrainingSystem user={user} />;
       case 'reports':    return <ReportsTab />;
       case 'inventory':  return <InventoryTab />;
-      case 'settings':   return <SettingsTab />;
+      case 'settings':   return <SettingsTab user={user} />;
       case 'profile':    return <ProfilePage user={user} />;
       default:           return <OverviewTab />;
     }

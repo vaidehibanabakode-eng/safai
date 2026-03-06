@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, UserCheck, CheckCircle, Loader2, MapPin,
   X, Mail, Phone, Award, ClipboardList, TrendingUp,
+  UserPlus, Edit, Trash2, Info,
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 interface WorkerData {
@@ -31,10 +32,16 @@ const WorkersTab: React.FC = () => {
   const [selectedWorker, setSelectedWorker] = useState<WorkerData | null>(null);
   const [workerStats, setWorkerStats] = useState<WorkerStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [editWorker, setEditWorker] = useState<WorkerData | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<WorkerData | null>(null);
+  const [showAddInfo, setShowAddInfo] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', assignedZone: '', workerType: '', phone: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', '==', 'Worker'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Query for both capitalized and lowercase role values to catch all workers
+    const q1 = query(collection(db, 'users'), where('role', 'in', ['Worker', 'worker']));
+    const unsubscribe = onSnapshot(q1, (snapshot) => {
       const fetched: WorkerData[] = [];
       snapshot.forEach((docSnap) => {
         fetched.push({ id: docSnap.id, ...docSnap.data() } as WorkerData);
@@ -67,11 +74,55 @@ const WorkersTab: React.FC = () => {
 
   const uniqueZones = new Set(workers.map(w => w.assignedZone).filter(Boolean)).size;
 
+  const handleEditWorker = (worker: WorkerData) => {
+    setEditForm({ name: worker.name, assignedZone: worker.assignedZone || '', workerType: worker.workerType || '', phone: worker.phone || '' });
+    setEditWorker(worker);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editWorker) return;
+    setSavingEdit(true);
+    try {
+      await updateDoc(doc(db, 'users', editWorker.id), {
+        name: editForm.name,
+        assignedZone: editForm.assignedZone,
+        workerType: editForm.workerType,
+        phone: editForm.phone,
+        updatedAt: serverTimestamp(),
+      });
+      setEditWorker(null);
+    } catch (err) {
+      console.error('Error updating worker:', err);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeleteWorker = async () => {
+    if (!confirmDelete) return;
+    try {
+      await deleteDoc(doc(db, 'users', confirmDelete.id));
+      setConfirmDelete(null);
+    } catch (err) {
+      console.error('Error removing worker:', err);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Worker Management</h2>
         <p className="text-gray-600">Monitor and manage the field workforce</p>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowAddInfo(true)}
+          className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-3 rounded-xl hover:bg-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+        >
+          <UserPlus className="w-5 h-5" />
+          Add Worker
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -161,12 +212,28 @@ const WorkersTab: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => openDetails(worker)}
-                        className="text-emerald-600 hover:text-emerald-900 text-sm font-semibold transition-colors hover:underline"
-                      >
-                        View Details
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEditWorker(worker)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors p-1.5 hover:bg-blue-50 rounded-lg"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(worker)}
+                          className="text-red-500 hover:text-red-700 text-sm font-medium transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                          title="Remove"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openDetails(worker)}
+                          className="text-emerald-600 hover:text-emerald-900 text-sm font-semibold transition-colors hover:underline"
+                        >
+                          View Details
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -289,6 +356,99 @@ const WorkersTab: React.FC = () => {
                 className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Worker Info Modal ────────────────────────────────────────── */}
+      {showAddInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowAddInfo(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-gray-900">Add New Worker</h3>
+              <button onClick={() => setShowAddInfo(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-semibold mb-1">How to onboard a new Worker</p>
+                  <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                    <li>Have the worker create an account via the <strong>Sign Up</strong> page and select "Worker" as their role</li>
+                    <li>Once registered, they will automatically appear here in the Worker Roster</li>
+                    <li>You can then edit their zone assignment and worker type</li>
+                    <li>Their attendance and tasks will be tracked from day one</li>
+                  </ol>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button onClick={() => setShowAddInfo(false)} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors">Got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Worker Modal ───────────────────────────────────────────── */}
+      {editWorker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setEditWorker(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-gray-900">Edit Worker — {editWorker.name}</h3>
+              <button onClick={() => setEditWorker(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Full Name</label>
+                <input type="text" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Assigned Zone</label>
+                <select value={editForm.assignedZone} onChange={e => setEditForm(f => ({ ...f, assignedZone: e.target.value }))} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white">
+                  <option value="">Unassigned</option>
+                  {['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Zone E', 'Zone F'].map(z => <option key={z} value={z}>{z}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Worker Type</label>
+                <select value={editForm.workerType} onChange={e => setEditForm(f => ({ ...f, workerType: e.target.value }))} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white">
+                  <option value="">Select type</option>
+                  {['Driver', 'Collector', 'Supervisor', 'Team Lead'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Phone</label>
+                <input type="tel" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="+91 9000000000" />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+              <button onClick={() => setEditWorker(null)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancel</button>
+              <button onClick={handleSaveEdit} disabled={savingEdit} className="px-6 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2">
+                {savingEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Worker Confirmation ──────────────────────────────────── */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDelete(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-7 h-7 text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Remove Worker</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Are you sure you want to remove <strong>{confirmDelete.name}</strong> from the system? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => setConfirmDelete(null)} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50">Cancel</button>
+              <button onClick={handleDeleteWorker} className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 flex items-center gap-2">
+                <Trash2 className="w-4 h-4" /> Remove
               </button>
             </div>
           </div>

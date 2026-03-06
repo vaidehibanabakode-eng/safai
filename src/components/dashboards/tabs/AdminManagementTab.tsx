@@ -48,7 +48,7 @@ const AdminManagementTab: React.FC = () => {
   const [admins, setAdmins] = useState<Admin[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', '==', 'Admin'));
+    const q = query(collection(db, 'users'), where('role', 'in', ['Admin', 'admin']));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetched: Admin[] = [];
       snapshot.forEach((docSnap) => {
@@ -251,6 +251,7 @@ const AdminManagementTab: React.FC = () => {
             <table className="w-full min-w-[1000px]">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_name')}</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_email')}</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{t('header_area')}</th>
@@ -262,6 +263,9 @@ const AdminManagementTab: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentData.length > 0 ? currentData.map((admin) => (
                   <tr key={admin.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-xs font-mono text-gray-400" title={admin.id}>{admin.id.slice(0, 8)}…</span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold mr-3 border ${admin.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
@@ -328,7 +332,7 @@ const AdminManagementTab: React.FC = () => {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">{t('no_admins_found')}</td>
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">{t('no_admins_found')}</td>
                   </tr>
                 )}
               </tbody>

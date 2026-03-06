@@ -57,13 +57,13 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
 
     // ── 2. Workers count ───────────────────────────────────────────────────
     const unsubscribeWorkers = onSnapshot(
-      query(collection(db, 'users'), where('role', '==', 'Worker')),
+      query(collection(db, 'users'), where('role', 'in', ['Worker', 'worker'])),
       (snapshot) => setStats(prev => ({ ...prev, activeWorkers: snapshot.docs.length, loading: false }))
     );
 
     // ── 3. Citizens count ─────────────────────────────────────────────────
     const unsubscribeCitizens = onSnapshot(
-      query(collection(db, 'users'), where('role', '==', 'Citizen')),
+      query(collection(db, 'users'), where('role', 'in', ['Citizen', 'citizen'])),
       (snapshot) => setStats(prev => ({ ...prev, citizens: snapshot.docs.length }))
     );
 

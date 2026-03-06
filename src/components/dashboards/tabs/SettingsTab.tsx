@@ -21,7 +21,7 @@ import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../../lib/firebase';
 import packageInfo from '../../../../package.json';
 
-// import { useTheme } from '../../../contexts/ThemeContext'; // Removed
+import { useTheme } from '../../../contexts/ThemeContext';
 
 interface SettingsTabProps {
     user?: User;
@@ -86,10 +86,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
         window.location.href = 'mailto:support@safaiconnect.in?subject=SafaiConnect Support Request';
     };
 
-    // const { theme, toggleTheme } = useTheme(); // Removed for forced light mode
+    const { theme, toggleTheme } = useTheme();
     const { t } = useLanguage();
 
-    // const isDark = theme === 'dark'; // Removed
+    const isDark = theme === 'dark';
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
@@ -119,6 +119,18 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ user }) => {
                             </div>
                         </div>
 
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="font-medium text-gray-900">Dark Mode</p>
+                                <p className="text-sm text-gray-500">Switch between light and dark theme</p>
+                            </div>
+                            <button
+                                onClick={toggleTheme}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isDark ? 'bg-emerald-600' : 'bg-gray-200'}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isDark ? 'translate-x-6' : 'translate-x-1'}`} />
+                            </button>
+                        </div>
 
                     </div>
                 </div>

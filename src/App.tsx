@@ -5,6 +5,7 @@ import SignupPage from './components/SignupPage';
 import SuperadminDashboard from './components/dashboards/SuperadminDashboard';
 import AdminDashboard from './components/dashboards/AdminDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
+import GreenChampionDashboard from './components/dashboards/GreenChampionDashboard';
 import CitizenDashboard from './components/dashboards/CitizenDashboard';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuth } from './contexts/AuthContext';
@@ -183,8 +184,8 @@ function App() {
         console.log('✅ Loading WorkerDashboard');
         return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;
       case 'green-champion':
-        console.log('✅ Loading CitizenDashboard (Green Champion)');
-        return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;
+        console.log('✅ Loading GreenChampionDashboard');
+        return <GreenChampionDashboard user={activeUser} onLogout={handleLogout} />;
       case 'citizen':
         console.log('✅ Loading CitizenDashboard');
         return <CitizenDashboard user={activeUser} onLogout={handleLogout} />;

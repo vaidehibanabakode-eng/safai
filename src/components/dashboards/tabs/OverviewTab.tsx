@@ -130,17 +130,17 @@ const OverviewTab: React.FC = () => {
         });
 
         const workersUnsub = onSnapshot(
-            query(collection(db, 'users'), where('role', '==', 'Worker')),
+            query(collection(db, 'users'), where('role', 'in', ['Worker', 'worker'])),
             (snap) => setStats(prev => ({ ...prev, totalWorkers: snap.docs.length }))
         );
 
         const adminsUnsub = onSnapshot(
-            query(collection(db, 'users'), where('role', '==', 'Admin')),
+            query(collection(db, 'users'), where('role', 'in', ['Admin', 'admin'])),
             (snap) => setStats(prev => ({ ...prev, totalAdmins: snap.docs.length }))
         );
 
         const citizensUnsub = onSnapshot(
-            query(collection(db, 'users'), where('role', '==', 'Citizen')),
+            query(collection(db, 'users'), where('role', 'in', ['Citizen', 'citizen'])),
             (snap) => setStats(prev => ({ ...prev, totalCitizens: snap.docs.length, loading: false }))
         );
 

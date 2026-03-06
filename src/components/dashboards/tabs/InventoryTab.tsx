@@ -106,6 +106,7 @@ interface ModalProps {
 const ItemModal: React.FC<ModalProps> = ({ item, activeTab, onClose, onSave }) => {
     const isEdit = !!item;
     const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
     const [form, setForm] = useState({
         type: (item?.type ?? activeTab) as ItemType,
         name: item?.name ?? '',
@@ -122,6 +123,7 @@ const ItemModal: React.FC<ModalProps> = ({ item, activeTab, onClose, onSave }) =
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
+        setError('');
         try {
             await onSave({
                 type: form.type,
@@ -134,6 +136,9 @@ const ItemModal: React.FC<ModalProps> = ({ item, activeTab, onClose, onSave }) =
                 value: Number(form.value) || undefined,
             });
             onClose();
+        } catch (err: any) {
+            console.error('Error saving inventory item:', err);
+            setError(err.message || 'Failed to save item. Please try again.');
         } finally {
             setSaving(false);
         }
@@ -155,6 +160,11 @@ const ItemModal: React.FC<ModalProps> = ({ item, activeTab, onClose, onSave }) =
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {error && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium border border-red-100">
+                            {error}
+                        </div>
+                    )}
                     {/* Name */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>

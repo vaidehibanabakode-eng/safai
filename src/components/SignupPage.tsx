@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserPlus, ArrowLeft, CheckCircle } from 'lucide-react';
+import { UserPlus, ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
@@ -18,6 +18,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
     const [role, setRole] = useState<UserRole | ''>('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const { t } = useLanguage();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -31,15 +32,15 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             return;
         }
 
-        // Store roles in lowercase for consistent comparison throughout the app
+        // Store roles in capitalized form for consistent Firestore queries
         const roleMap: Record<string, string> = {
-            worker: 'worker',
-            citizen: 'citizen',
-            admin: 'admin',
-            superadmin: 'superadmin',
-            'green-champion': 'green-champion'
+            worker: 'Worker',
+            citizen: 'Citizen',
+            admin: 'Admin',
+            superadmin: 'Superadmin',
+            'green-champion': 'Green-Champion'
         };
-        const firestoreRole = roleMap[role] || 'citizen';
+        const firestoreRole = roleMap[role] || 'Citizen';
         console.log('📝 Signup: Saving role to Firestore:', { selectedRole: role, firestoreRole });
 
         try {
@@ -110,15 +111,15 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
             const userCredential = await signInWithPopup(auth, googleProvider);
             const user = userCredential.user;
 
-            // Store roles in lowercase for consistent comparison throughout the app
+            // Store roles in capitalized form for consistent Firestore queries
             const roleMap: Record<string, string> = {
-                worker: 'worker',
-                citizen: 'citizen',
-                admin: 'admin',
-                superadmin: 'superadmin',
-                'green-champion': 'green-champion'
+                worker: 'Worker',
+                citizen: 'Citizen',
+                admin: 'Admin',
+                superadmin: 'Superadmin',
+                'green-champion': 'Green-Champion'
             };
-            const firestoreRole = roleMap[role] || 'citizen';
+            const firestoreRole = roleMap[role] || 'Citizen';
             console.log('📝 Google Signup: Saving role to Firestore:', { selectedRole: role, firestoreRole });
 
             // Check if user already exists in Firestore
@@ -302,14 +303,24 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1">{t('password')}</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
-                                    placeholder="••••••••"
-                                    required
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="block w-full px-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none text-gray-900 placeholder-gray-400"
+                                        placeholder="••••••••"
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-emerald-500 transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                    </button>
+                                </div>
                             </div>
 
                         </div>

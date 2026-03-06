@@ -143,10 +143,10 @@ test('digital ID shows worker name and email', async ({ page }) => {
   expect(hasWorkerInfo).toBe(true);
 });
 
-// ── Salary Tab ────────────────────────────────────────────────────────────────
+// ── Settings Tab ──────────────────────────────────────────────────────────────
 
-test('salary tab loads without errors', async ({ page }) => {
-  await clickTab(page, 'Salary');
+test('settings tab loads without errors', async ({ page }) => {
+  await clickTab(page, 'Settings');
   await page.waitForTimeout(2_000);
   const body = await page.locator('main').textContent();
   expect(body).toBeTruthy();

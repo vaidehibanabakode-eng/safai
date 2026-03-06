@@ -121,39 +121,21 @@ test('salary tracking tab loads without errors', async ({ page }) => {
   expect(body).not.toContain('Cannot read');
 });
 
-// ── Reports Tab ───────────────────────────────────────────────────────────────
+// ── Training Tab ──────────────────────────────────────────────────────────────
 
-test('reports tab loads without errors', async ({ page }) => {
-  await clickTab(page, 'Reports');
+test('training tab loads without errors', async ({ page }) => {
+  await clickTab(page, 'Training');
   await page.waitForTimeout(2_000);
   const body = await page.locator('main').textContent();
   expect(body).toBeTruthy();
   expect(body).not.toContain('Cannot read');
 });
 
-// ── Heatmap Tab ───────────────────────────────────────────────────────────────
+// ── Sidebar Access ────────────────────────────────────────────────────────────
 
-test('heatmap tab loads without errors', async ({ page }) => {
-  await clickTab(page, 'Heatmap');
-  await page.waitForTimeout(3_000);
-  const body = await page.locator('main').textContent();
-  expect(body).toBeTruthy();
-  // The leaflet map should load
-  const hasMapContent = body!.includes('Heatmap') ||
-    body!.includes('map') ||
-    body!.includes('Map') ||
-    body!.includes('Loading');
-  expect(hasMapContent).toBe(true);
-});
-
-// ── Broadcast Tab ─────────────────────────────────────────────────────────────
-
-test('broadcast tab loads without errors', async ({ page }) => {
-  await clickTab(page, 'Broadcast');
-  await page.waitForTimeout(2_000);
-  const body = await page.locator('main').textContent();
-  expect(body).toBeTruthy();
-  expect(body).not.toContain('Cannot read');
+test('admin does not see superadmin-only tabs', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Admin Management', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Inventory Management', exact: true })).not.toBeVisible();
 });
 
 // ── Settings Tab ──────────────────────────────────────────────────────────────

@@ -379,13 +379,21 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
               <div className="bg-white p-12 text-center rounded-2xl border border-gray-200">
                 <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900">No active task selected</h3>
-                <p className="text-gray-500 mt-2">Please go back to your tasks and select 'Submit Proof' on an in-progress task.</p>
-                <button
-                  onClick={() => setActiveTab('tasks')}
-                  className="mt-6 px-6 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200"
-                >
-                  View My Tasks
-                </button>
+                <p className="text-gray-500 mt-2">Take a photo of your completed work as proof.</p>
+                <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={() => proofCameraInputRef.current?.click()}
+                    className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+                  >
+                    <Camera className="w-5 h-5" /> Open Camera
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('tasks')}
+                    className="px-6 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200"
+                  >
+                    Select a Task First
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="grid lg:grid-cols-3 gap-6">
@@ -748,8 +756,10 @@ const AttendanceTab: React.FC<{ workerId: string; workerName: string }> = ({ wor
     setActing(true);
     try {
       const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      // Destructure to exclude the 'id' field which shouldn't be written to Firestore
+      const { id, ...recordData } = todayRecord;
       await setDoc(doc(db, 'attendance', docId(today)), {
-        ...todayRecord,
+        ...recordData,
         checkOut: timeStr,
         checkOutTs: serverTimestamp(),
       });
@@ -784,6 +794,21 @@ const AttendanceTab: React.FC<{ workerId: string; workerName: string }> = ({ wor
 
   const isCheckedIn = !!todayRecord?.checkIn;
   const isCheckedOut = !!todayRecord?.checkOut;
+
+  // Time-based check-out: Only show button after minimum shift duration (4 hours)
+  const MIN_SHIFT_HOURS = 4;
+  const canCheckOut = (() => {
+    if (!isCheckedIn || isCheckedOut || !todayRecord?.checkInTs) return false;
+    try {
+      const checkInTime = typeof todayRecord.checkInTs.toDate === 'function'
+        ? todayRecord.checkInTs.toDate()
+        : new Date(todayRecord.checkInTs);
+      const hoursElapsed = (now.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+      return hoursElapsed >= MIN_SHIFT_HOURS;
+    } catch {
+      return true; // Allow checkout if timestamp can't be parsed
+    }
+  })();
 
   return (
     <div className="space-y-8">
@@ -884,11 +909,11 @@ const AttendanceTab: React.FC<{ workerId: string; workerName: string }> = ({ wor
               {!isCheckedOut && isCheckedIn && (
                 <button
                   onClick={handleCheckOut}
-                  disabled={acting}
+                  disabled={acting || !canCheckOut}
                   className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-                  Check Out Now
+                  {!canCheckOut ? `Available after ${MIN_SHIFT_HOURS}h shift` : 'Check Out Now'}
                 </button>
               )}
               {isCheckedOut && (

@@ -25,7 +25,8 @@ import { User } from '../../App';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { db, auth } from '../../lib/firebase';
 
 interface ProfilePageProps {
     user: User;
@@ -67,6 +68,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
     const [saved, setSaved] = useState(false);
     const [memberSince, setMemberSince] = useState<string>('—');
     const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
+    const [sendingReset, setSendingReset] = useState(false);
+
+    const handleChangePassword = async () => {
+        const email = user.email || auth.currentUser?.email;
+        if (!email) { toastError('No email address found for this account.'); return; }
+        setSendingReset(true);
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toastSuccess(`Password reset email sent to ${email}. Check your inbox.`);
+        } catch (err: any) {
+            toastError(err.message || 'Failed to send reset email. Please try again.');
+        } finally {
+            setSendingReset(false);
+        }
+    };
 
     const [form, setForm] = useState({
         name: user.name,
@@ -491,9 +507,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
                 )}
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                    <button className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors">
-                        <Lock className="w-4 h-4" />
-                        {t('change_password')}
+                    <button
+                        onClick={handleChangePassword}
+                        disabled={sendingReset}
+                        className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors disabled:opacity-60"
+                    >
+                        {sendingReset ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                        {sendingReset ? 'Sending reset email...' : t('change_password')}
                     </button>
                     <button className="flex items-center gap-2 px-5 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors">
                         <Shield className="w-4 h-4" />
