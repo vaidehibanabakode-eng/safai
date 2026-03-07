@@ -8,7 +8,7 @@ import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../../lib/firebase';
-import { createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, getAuth } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { useAllZones } from '../../../hooks/useCascadingLocation';
 

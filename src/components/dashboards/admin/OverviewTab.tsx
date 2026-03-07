@@ -4,7 +4,7 @@ import {
   CheckCircle, Clock, TrendingUp, UserCheck,
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { collection, query, onSnapshot, where, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 interface OverviewTabProps {
