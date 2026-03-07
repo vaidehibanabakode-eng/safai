@@ -121,17 +121,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
           className="absolute inset-0 w-full h-full object-cover"
         />
 
-        <div className="relative z-20 text-white p-12 max-w-lg">
-          <div className="flex items-center space-x-3 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="bg-white/20 p-2 rounded-2xl backdrop-blur-sm shadow-xl border border-white/10">
-              <img src="/logo.png" alt="Safai Connect Logo" className="w-auto h-12 object-contain drop-shadow-md" />
-            </div>
+        <div className="relative z-20 text-white p-12 max-w-lg space-y-6">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <img src="/logo.png" alt="Safai Connect Logo" className="w-auto h-12 object-contain block mix-blend-screen" />
           </div>
 
-          <h2 className="text-5xl font-bold leading-tight mb-6 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+          <h2 className="text-5xl font-bold leading-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
             {t('welcome_back')}
           </h2>
-          <p className="text-lg text-emerald-100 mb-8 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+          <p className="text-lg text-emerald-100 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
             {t('login_subtitle')}
           </p>
 
