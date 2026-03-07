@@ -62,6 +62,14 @@ const demoUsers = [
     role: 'Green-Champion',
     rewardPoints: 200,
   },
+  {
+    email: 'zonaladmin@demo.com',
+    name: 'Demo Zonal Admin',
+    role: 'Zonal-Admin',
+    assignedZone: 'Dharampeth',
+    zoneId: 'zone_dharampeth',
+    cityId: 'nagpur',
+  },
 ];
 
 // Demo complaints with lat/lng for heatmap demo
@@ -128,6 +136,8 @@ async function seed() {
       name: user.name,
       role: user.role,
       assignedZone: (user as any).assignedZone || '',
+      zoneId: (user as any).zoneId || '',
+      cityId: (user as any).cityId || '',
       rewardPoints: (user as any).rewardPoints ?? (user.role === 'Citizen' ? 0 : undefined),
       phone: '',
       address: '',

@@ -40,6 +40,12 @@ export const DEMO_CREDENTIALS = {
     buttonLabel: 'Champion',
     dashboardMarker: 'Green Champion',
   },
+  zonalAdmin: {
+    email: 'zonaladmin@demo.com',
+    password: DEMO_PASSWORD,
+    buttonLabel: 'Zonal Admin',
+    dashboardMarker: 'Zone Overview',
+  },
 } as const;
 
 export type DemoRole = keyof typeof DEMO_CREDENTIALS;

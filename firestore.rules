@@ -25,6 +25,10 @@ service cloud.firestore {
       return isAuthenticated() && (getUserRole() == 'Admin' || getUserRole() == 'admin' || isSuperadmin());
     }
 
+    function isZonalAdmin() {
+      return isAuthenticated() && (getUserRole() == 'Zonal-Admin' || getUserRole() == 'zonal-admin' || isAdmin());
+    }
+
     function isWorker() {
       return isAuthenticated() && (getUserRole() == 'Worker' || getUserRole() == 'worker' || isAdmin());
     }
@@ -76,7 +80,7 @@ service cloud.firestore {
     // ── `assignments` collection ──────────────────────────────────────────────
     match /assignments/{assignmentId} {
       allow read:   if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if isZonalAdmin();
       allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }

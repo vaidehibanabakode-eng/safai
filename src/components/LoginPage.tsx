@@ -266,6 +266,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
                 { role: 'Admin',         email: 'admin@demo.com',      icon: '📊', cls: 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100' },
                 { role: 'Super Admin',   email: 'superadmin@demo.com', icon: '🛡️', cls: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100' },
                 { role: 'Champion',      email: 'champion@demo.com',   icon: '🌿', cls: 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' },
+                { role: 'Zonal Admin',   email: 'zonaladmin@demo.com', icon: '🏢', cls: 'bg-cyan-50 border-cyan-200 text-cyan-800 hover:bg-cyan-100' },
               ].map(d => (
                 <button
                   key={d.role}
