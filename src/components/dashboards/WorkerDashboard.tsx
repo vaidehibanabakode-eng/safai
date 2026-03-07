@@ -156,9 +156,16 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
   };
 
   const handleProofPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10 MB per photo
     const files = Array.from(e.target.files || []);
     const remaining = 5 - proofPhotos.length;
     const startIndex = proofPhotos.length;
+    const oversized = files.find((f) => f.size > MAX_PHOTO_BYTES);
+    if (oversized) {
+      toastError(`Photo "${oversized.name}" is too large (${(oversized.size / 1024 / 1024).toFixed(1)} MB). Max 10 MB per photo.`);
+      e.target.value = '';
+      return;
+    }
     const toAdd: GeoPhoto[] = files.slice(0, remaining).map((file) => ({
       file,
       preview: URL.createObjectURL(file),

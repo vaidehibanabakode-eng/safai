@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   Plus, Edit, Trash2, X, Loader2, ChevronRight,
   Building2, Map, LayoutGrid, CheckCircle, AlertTriangle,
+  ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 interface City { id: string; name: string; state: string; }
-interface Zone { id: string; name: string; cityId: string; }
-interface Ward { id: string; name: string; zoneId: string; cityId: string; }
+interface Zone { id: string; name: string; cityId: string; isActive?: boolean; }
+interface Ward { id: string; name: string; zoneId: string; cityId: string; isActive?: boolean; }
 
 const LocationManagementTab: React.FC = () => {
   const [cities, setCities] = useState<City[]>([]);
@@ -97,10 +98,12 @@ const LocationManagementTab: React.FC = () => {
           await setDoc(doc(db, 'zones', id), {
             name: formName.trim(),
             cityId: selectedCityId,
+            isActive: true,
             createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
           });
         } else {
-          await updateDoc(doc(db, 'zones', modal.data.id), { name: formName.trim() });
+          await updateDoc(doc(db, 'zones', modal.data.id), { name: formName.trim(), updatedAt: serverTimestamp() });
         }
       } else if (modal?.type === 'ward') {
         if (modal.mode === 'add') {
@@ -109,10 +112,12 @@ const LocationManagementTab: React.FC = () => {
             name: formName.trim(),
             zoneId: selectedZoneId,
             cityId: selectedCityId,
+            isActive: true,
             createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
           });
         } else {
-          await updateDoc(doc(db, 'wards', modal.data.id), { name: formName.trim() });
+          await updateDoc(doc(db, 'wards', modal.data.id), { name: formName.trim(), updatedAt: serverTimestamp() });
         }
       }
       showToast(`${modal?.type} ${modal?.mode === 'add' ? 'added' : 'updated'} successfully.`);
@@ -155,6 +160,23 @@ const LocationManagementTab: React.FC = () => {
       showToast(err.message || 'Failed to delete.', false);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleActive = async (type: 'zone' | 'ward', id: string, currentlyActive: boolean) => {
+    try {
+      const col = type === 'zone' ? 'zones' : 'wards';
+      await updateDoc(doc(db, col, id), { isActive: !currentlyActive, updatedAt: serverTimestamp() });
+      if (type === 'zone' && !currentlyActive === false) {
+        // Deactivating a zone — also deactivate its wards
+        const childWards = wards.filter(w => w.zoneId === id);
+        for (const w of childWards) {
+          await updateDoc(doc(db, 'wards', w.id), { isActive: false, updatedAt: serverTimestamp() });
+        }
+      }
+      showToast(`${type} ${!currentlyActive ? 'activated' : 'deactivated'}.`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to toggle status.', false);
     }
   };
 
@@ -263,14 +285,20 @@ const LocationManagementTab: React.FC = () => {
               ) : filteredZones.map(zone => (
                 <div
                   key={zone.id}
-                  className={`px-5 py-3 flex items-center justify-between cursor-pointer transition-colors ${selectedZoneId === zone.id ? 'bg-emerald-50 border-l-4 border-l-emerald-600' : 'hover:bg-gray-50'}`}
+                  className={`px-5 py-3 flex items-center justify-between cursor-pointer transition-colors ${zone.isActive === false ? 'opacity-60' : ''} ${selectedZoneId === zone.id ? 'bg-emerald-50 border-l-4 border-l-emerald-600' : 'hover:bg-gray-50'}`}
                   onClick={() => setSelectedZoneId(zone.id)}
                 >
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{zone.name}</p>
+                    <p className="font-medium text-gray-900 truncate flex items-center gap-2">
+                      {zone.name}
+                      {zone.isActive === false && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-semibold">Inactive</span>}
+                    </p>
                     <p className="text-xs text-gray-500">{wards.filter(w => w.zoneId === zone.id).length} wards</p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={(e) => { e.stopPropagation(); toggleActive('zone', zone.id, zone.isActive !== false); }} className="p-1 hover:bg-gray-200 rounded" title={zone.isActive !== false ? 'Deactivate' : 'Activate'}>
+                      {zone.isActive !== false ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-gray-400" />}
+                    </button>
                     <button onClick={(e) => { e.stopPropagation(); openModal('zone', 'edit', zone); }} className="p-1 hover:bg-gray-200 rounded">
                       <Edit className="w-3.5 h-3.5 text-gray-400" />
                     </button>
@@ -303,11 +331,17 @@ const LocationManagementTab: React.FC = () => {
               ) : filteredWards.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 text-sm">No wards in {selectedZone?.name}</div>
               ) : filteredWards.map(ward => (
-                <div key={ward.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div key={ward.id} className={`px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors ${ward.isActive === false ? 'opacity-60' : ''}`}>
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{ward.name}</p>
+                    <p className="font-medium text-gray-900 truncate flex items-center gap-2">
+                      {ward.name}
+                      {ward.isActive === false && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-semibold">Inactive</span>}
+                    </p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => toggleActive('ward', ward.id, ward.isActive !== false)} className="p-1 hover:bg-gray-200 rounded" title={ward.isActive !== false ? 'Deactivate' : 'Activate'}>
+                      {ward.isActive !== false ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-gray-400" />}
+                    </button>
                     <button onClick={() => openModal('ward', 'edit', ward)} className="p-1 hover:bg-gray-200 rounded">
                       <Edit className="w-3.5 h-3.5 text-gray-400" />
                     </button>

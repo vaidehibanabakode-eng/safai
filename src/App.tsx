@@ -7,13 +7,14 @@ import AdminDashboard from './components/dashboards/AdminDashboard';
 import WorkerDashboard from './components/dashboards/WorkerDashboard';
 import GreenChampionDashboard from './components/dashboards/GreenChampionDashboard';
 import CitizenDashboard from './components/dashboards/CitizenDashboard';
+import ZonalAdminDashboard from './components/dashboards/ZonalAdminDashboard';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuth } from './contexts/AuthContext';
 import { auth } from './lib/firebase';
 import { signOut } from 'firebase/auth';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
-export type UserRole = 'superadmin' | 'admin' | 'green-champion' | 'worker' | 'citizen';
+export type UserRole = 'superadmin' | 'admin' | 'zonal-admin' | 'green-champion' | 'worker' | 'citizen';
 
 export interface User {
   id: string;
@@ -24,6 +25,8 @@ export interface User {
   address?: string;
   citizenID?: string;
   assignedZone?: string;
+  zoneId?: string;
+  cityId?: string;
   preferences?: {
     notifications?: boolean;
     language?: string;
@@ -167,6 +170,8 @@ function App() {
     address: userProfile.address,
     citizenID: userProfile.citizenID,
     assignedZone: userProfile.assignedZone || userProfile.area,
+    zoneId: userProfile.zoneId,
+    cityId: userProfile.cityId,
     preferences: userProfile.preferences,
   };
 
@@ -180,6 +185,9 @@ function App() {
       case 'admin':      
         console.log('✅ Loading AdminDashboard');
         return <AdminDashboard user={activeUser} onLogout={handleLogout} />;
+      case 'zonal-admin':
+        console.log('✅ Loading ZonalAdminDashboard');
+        return <ZonalAdminDashboard user={activeUser} onLogout={handleLogout} />;
       case 'worker':     
         console.log('✅ Loading WorkerDashboard');
         return <WorkerDashboard user={activeUser} onLogout={handleLogout} />;

@@ -12,6 +12,7 @@ export interface Zone {
   id: string;
   name: string;
   cityId: string;
+  isActive?: boolean;
 }
 
 export interface Ward {
@@ -19,6 +20,7 @@ export interface Ward {
   name: string;
   zoneId: string;
   cityId: string;
+  isActive?: boolean;
 }
 
 /** Returns live lists of cities, zones (filtered by cityId), and wards (filtered by zoneId). */
@@ -46,7 +48,7 @@ export function useCascadingLocation() {
     return () => unsub();
   }, []);
 
-  // Load zones when city changes
+  // Load zones when city changes (only active zones)
   useEffect(() => {
     setZones([]);
     setWards([]);
@@ -58,7 +60,10 @@ export function useCascadingLocation() {
     const q = query(collection(db, 'zones'), where('cityId', '==', selectedCityId));
     const unsub = onSnapshot(q, (snap) => {
       const list: Zone[] = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Zone));
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data.isActive !== false) list.push({ id: d.id, ...data } as Zone);
+      });
       list.sort((a, b) => a.name.localeCompare(b.name));
       setZones(list);
       setLoadingZones(false);
@@ -66,7 +71,7 @@ export function useCascadingLocation() {
     return () => unsub();
   }, [selectedCityId]);
 
-  // Load wards when zone changes
+  // Load wards when zone changes (only active wards)
   useEffect(() => {
     setWards([]);
     setSelectedWardId('');
@@ -76,7 +81,10 @@ export function useCascadingLocation() {
     const q = query(collection(db, 'wards'), where('zoneId', '==', selectedZoneId));
     const unsub = onSnapshot(q, (snap) => {
       const list: Ward[] = [];
-      snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Ward));
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data.isActive !== false) list.push({ id: d.id, ...data } as Ward);
+      });
       list.sort((a, b) => a.name.localeCompare(b.name));
       setWards(list);
       setLoadingWards(false);

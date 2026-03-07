@@ -17,6 +17,8 @@ export interface UserProfile {
     address?: string;
     citizenID?: string;
     assignedZone?: string;
+    zoneId?: string;
+    cityId?: string;
     memberSince?: any;
     preferences?: {
         notifications?: boolean;
@@ -150,6 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             address: firestoreData?.address,
                             citizenID: firestoreData?.citizenID,
                             assignedZone: firestoreData?.assignedZone,
+                            zoneId: firestoreData?.zoneId,
+                            cityId: firestoreData?.cityId,
                             memberSince: firestoreData?.memberSince,
                             preferences: firestoreData?.preferences
                         });

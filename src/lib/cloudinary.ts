@@ -2,9 +2,12 @@ const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
 
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
+
 interface UploadOptions {
   folder: string;
   onProgress?: (percent: number) => void;
+  maxBytes?: number;
 }
 
 interface CloudinaryResponse {
@@ -17,8 +20,13 @@ interface CloudinaryResponse {
 
 export async function uploadToCloudinary(
   file: File,
-  { folder, onProgress }: UploadOptions
+  { folder, onProgress, maxBytes }: UploadOptions
 ): Promise<CloudinaryResponse> {
+  const limit = maxBytes ?? MAX_UPLOAD_BYTES;
+  if (file.size > limit) {
+    throw new Error(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed is ${(limit / 1024 / 1024).toFixed(0)} MB.`);
+  }
+
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);

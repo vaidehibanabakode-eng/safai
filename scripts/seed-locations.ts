@@ -158,7 +158,9 @@ async function seed() {
       await db.collection('zones').doc(zone.id).set({
         name: zone.name,
         cityId,
+        isActive: true,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
 
       for (const ward of zone.wards) {
@@ -168,7 +170,9 @@ async function seed() {
           name: ward.name,
           zoneId: zone.id,
           cityId,
+          isActive: true,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }
     }
