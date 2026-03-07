@@ -65,7 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           'fixed left-0 top-16 z-40',
           'h-[calc(100vh-4rem)]',
           isCollapsed ? 'lg:w-20 w-80' : 'w-80',
-          'bg-white border-r border-gray-200 shadow-sm flex flex-col',
+          'bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-sm flex flex-col',
           'transform transition-all duration-300 ease-in-out',
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
@@ -87,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     isCollapsed ? 'lg:justify-center lg:px-0' : '',
                     item.active
                       ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30'
-                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
                   ].join(' ')}
                   title={isCollapsed ? item.label : undefined}
                 >
@@ -108,7 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         {/* Footer Area for Collapse Toggle and Logout */}
-        <div className="p-4 border-t border-gray-100 flex flex-col gap-2 bg-white z-10">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-2 bg-white dark:bg-gray-800 z-10">
           <button
             onClick={onToggleCollapse}
             className="hidden lg:flex w-full items-center justify-center gap-3 px-4 py-3 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors"

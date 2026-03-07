@@ -41,6 +41,30 @@ service cloud.firestore {
       allow delete: if isSuperadmin();
     }
 
+    // ── `cities` collection ─────────────────────────────────────────────────
+    match /cities/{cityId} {
+      allow read:   if isAuthenticated();
+      allow create: if isSuperadmin();
+      allow update: if isSuperadmin();
+      allow delete: if isSuperadmin();
+    }
+
+    // ── `zones` collection ─────────────────────────────────────────────────
+    match /zones/{zoneId} {
+      allow read:   if isAuthenticated();
+      allow create: if isSuperadmin();
+      allow update: if isSuperadmin();
+      allow delete: if isSuperadmin();
+    }
+
+    // ── `wards` collection ─────────────────────────────────────────────────
+    match /wards/{wardId} {
+      allow read:   if isAuthenticated();
+      allow create: if isSuperadmin();
+      allow update: if isSuperadmin();
+      allow delete: if isSuperadmin();
+    }
+
     // ── `complaints` collection ───────────────────────────────────────────────
     match /complaints/{complaintId} {
       allow read:   if isAuthenticated();
@@ -121,6 +145,15 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId);
       allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ── `training_materials` collection ──────────────────────────────────────
+    // Uploaded by superadmins; readable by all authenticated users
+    match /training_materials/{materialId} {
+      allow read:   if isAuthenticated();
+      allow create: if isSuperadmin();
+      allow update: if isSuperadmin();
+      allow delete: if isSuperadmin();
     }
 
   }

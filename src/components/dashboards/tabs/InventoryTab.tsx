@@ -516,14 +516,23 @@ const InventoryTab: React.FC = () => {
                         </button>
                     ))}
                 </div>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder={`Search ${activeTab === 'vehicle' ? 'vehicles' : 'equipment'}…`}
-                        className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white w-56"
-                    />
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder={`Search ${activeTab === 'vehicle' ? 'vehicles' : 'equipment'}…`}
+                            className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white w-56"
+                        />
+                    </div>
+                    <button
+                        onClick={() => { setEditItem(null); setModalOpen(true); }}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 shadow-sm transition-all text-sm font-semibold"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add {activeTab === 'vehicle' ? 'Vehicle' : 'Equipment'}
+                    </button>
                 </div>
             </div>
 

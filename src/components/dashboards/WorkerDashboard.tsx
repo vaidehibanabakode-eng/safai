@@ -10,6 +10,7 @@ import { User } from '../../App';
 import Layout from '../common/Layout';
 import StatCard from '../common/StatCard';
 import TrainingSystem from '../training/TrainingSystem';
+import TrainingMaterialsViewer from '../training/TrainingMaterialsViewer';
 import ProfilePage from '../common/ProfilePage';
 import SettingsTab from './tabs/SettingsTab';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -773,7 +774,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
             </div>
           </div>
         );
-      case 'training': return <TrainingSystem user={user} />;
+      case 'training': return <WorkerTrainingWrapper user={user} />;
       case 'settings': return <SettingsTab user={user} />;
       case 'profile': return <ProfilePage user={user} />;
       default: return null;
@@ -1120,6 +1121,34 @@ const AttendanceTab: React.FC<{ workerId: string; workerName: string }> = ({ wor
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+// ── Worker Training Wrapper (sub-tabs: Exercises + Materials) ────────────────
+const WorkerTrainingWrapper: React.FC<{ user: User }> = ({ user }) => {
+  const [subTab, setSubTab] = useState<'exercises' | 'materials'>('exercises');
+  return (
+    <div className="space-y-6">
+      <div className="flex bg-gray-100 rounded-xl p-1 gap-1 w-fit">
+        {[
+          { key: 'exercises' as const, label: 'Training Exercises' },
+          { key: 'materials' as const, label: 'Training Materials' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setSubTab(tab.key)}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+              subTab === tab.key
+                ? 'bg-white text-emerald-700 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {subTab === 'exercises' ? <TrainingSystem user={user} /> : <TrainingMaterialsViewer />}
     </div>
   );
 };

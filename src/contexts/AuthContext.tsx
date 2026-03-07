@@ -141,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         setUserProfile({
                             uid: user.uid,
                             email: user.email || '',
-                            name: user.displayName || firestoreData?.name || 'User',
+                            name: firestoreData?.name || user.displayName || 'User',
                             role: resolvedRole,
                             area: firestoreData?.area,
                             rewardPoints: firestoreData?.rewardPoints,

@@ -34,7 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, sidebarItems,
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
       <Header
         user={user}
         toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -57,7 +57,7 @@ const Layout: React.FC<LayoutProps> = ({ user, onLogout, children, sidebarItems,
       {/* Logout Confirmation Modal - Moved here to be outside Header stacking context */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4 transform transition-all scale-100 border border-gray-100">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4 transform transition-all scale-100 border border-gray-100 dark:border-gray-700">
             <h3 className="text-lg font-bold text-gray-900 mb-2">{t('confirm_logout')}</h3>
             <p className="text-gray-600 mb-6">
               {t('confirm_logout_msg')}

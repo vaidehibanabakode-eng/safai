@@ -25,7 +25,7 @@ import { User } from '../../App';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { db, auth } from '../../lib/firebase';
 
 interface ProfilePageProps {
@@ -68,19 +68,52 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
     const [saved, setSaved] = useState(false);
     const [memberSince, setMemberSince] = useState<string>('—');
     const [showPromoteConfirm, setShowPromoteConfirm] = useState(false);
-    const [sendingReset, setSendingReset] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
+    const [changingPassword, setChangingPassword] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
 
-    const handleChangePassword = async () => {
-        const email = user.email || auth.currentUser?.email;
-        if (!email) { toastError('No email address found for this account.'); return; }
-        setSendingReset(true);
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError('');
+
+        if (passwordForm.new.length < 6) {
+            setPasswordError('New password must be at least 6 characters.');
+            return;
+        }
+        if (passwordForm.new !== passwordForm.confirm) {
+            setPasswordError('New passwords do not match.');
+            return;
+        }
+        if (passwordForm.current === passwordForm.new) {
+            setPasswordError('New password must be different from current password.');
+            return;
+        }
+
+        const currentUser = auth.currentUser;
+        if (!currentUser || !currentUser.email) {
+            toastError('No authenticated user found. Please log in again.');
+            return;
+        }
+
+        setChangingPassword(true);
         try {
-            await sendPasswordResetEmail(auth, email);
-            toastSuccess(`Password reset email sent to ${email}. Check your inbox.`);
+            const credential = EmailAuthProvider.credential(currentUser.email, passwordForm.current);
+            await reauthenticateWithCredential(currentUser, credential);
+            await updatePassword(currentUser, passwordForm.new);
+            toastSuccess('Password changed successfully!');
+            setShowPasswordModal(false);
+            setPasswordForm({ current: '', new: '', confirm: '' });
         } catch (err: any) {
-            toastError(err.message || 'Failed to send reset email. Please try again.');
+            if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+                setPasswordError('Current password is incorrect.');
+            } else if (err.code === 'auth/too-many-requests') {
+                setPasswordError('Too many attempts. Please try again later.');
+            } else {
+                setPasswordError(err.message || 'Failed to change password. Please try again.');
+            }
         } finally {
-            setSendingReset(false);
+            setChangingPassword(false);
         }
     };
 
@@ -508,18 +541,93 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user }) => {
 
                 <div className="flex flex-col sm:flex-row gap-3">
                     <button
-                        onClick={handleChangePassword}
-                        disabled={sendingReset}
-                        className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors disabled:opacity-60"
+                        onClick={() => { setShowPasswordModal(true); setPasswordForm({ current: '', new: '', confirm: '' }); setPasswordError(''); }}
+                        className="flex items-center gap-2 px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors"
                     >
-                        {sendingReset ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                        {sendingReset ? 'Sending reset email...' : t('change_password')}
+                        <Lock className="w-4 h-4" />
+                        {t('change_password')}
                     </button>
                     <button className="flex items-center gap-2 px-5 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors">
                         <Shield className="w-4 h-4" />
                         {t('two_factor_auth')}
                     </button>
                 </div>
+
+                {/* Change Password Modal */}
+                {showPasswordModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in" onClick={() => setShowPasswordModal(false)}>
+                        <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+                                <h3 className="text-lg font-bold text-gray-900">Change Password</h3>
+                                <button onClick={() => setShowPasswordModal(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                                    <X className="w-5 h-5 text-gray-500" />
+                                </button>
+                            </div>
+                            <form onSubmit={handleChangePassword} className="p-5 space-y-4">
+                                {passwordError && (
+                                    <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm font-medium border border-red-100">
+                                        {passwordError}
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={passwordForm.current}
+                                        onChange={e => setPasswordForm(p => ({ ...p, current: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        placeholder="Enter current password"
+                                        autoComplete="current-password"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        minLength={6}
+                                        value={passwordForm.new}
+                                        onChange={e => setPasswordForm(p => ({ ...p, new: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        placeholder="At least 6 characters"
+                                        autoComplete="new-password"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        minLength={6}
+                                        value={passwordForm.confirm}
+                                        onChange={e => setPasswordForm(p => ({ ...p, confirm: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                        placeholder="Re-enter new password"
+                                        autoComplete="new-password"
+                                    />
+                                </div>
+                                <div className="flex gap-3 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswordModal(false)}
+                                        className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={changingPassword}
+                                        className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                                        {changingPassword ? 'Changing…' : 'Change Password'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Promote to Superadmin Confirmation Modal */}

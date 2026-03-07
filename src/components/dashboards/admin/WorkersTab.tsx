@@ -7,6 +7,7 @@ import {
 import StatCard from '../../common/StatCard';
 import { collection, query, where, onSnapshot, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
+import { useCascadingLocation } from '../../../hooks/useCascadingLocation';
 
 interface AttendanceStatus {
   checkIn?: string;
@@ -40,7 +41,8 @@ const WorkersTab: React.FC = () => {
   const [editWorker, setEditWorker] = useState<WorkerData | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<WorkerData | null>(null);
   const [showAddInfo, setShowAddInfo] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', assignedZone: '', workerType: '', phone: '' });
+  const [editForm, setEditForm] = useState({ name: '', assignedZone: '', workerType: '', phone: '', zoneId: '', wardId: '', cityId: '' });
+  const location = useCascadingLocation();
   const [savingEdit, setSavingEdit] = useState(false);
   const [todayAttendance, setTodayAttendance] = useState<Record<string, AttendanceStatus>>({});
 
@@ -99,7 +101,11 @@ const WorkersTab: React.FC = () => {
   const activeNow = Object.values(todayAttendance).filter(a => a.checkIn && !a.checkOut).length;
 
   const handleEditWorker = (worker: WorkerData) => {
-    setEditForm({ name: worker.name, assignedZone: worker.assignedZone || '', workerType: worker.workerType || '', phone: worker.phone || '' });
+    const wd = worker as any;
+    setEditForm({ name: worker.name, assignedZone: worker.assignedZone || '', workerType: worker.workerType || '', phone: worker.phone || '', zoneId: wd.zoneId || '', wardId: wd.wardId || '', cityId: wd.cityId || '' });
+    // Pre-select cascading dropdowns if worker already has location IDs
+    if (wd.cityId) location.setSelectedCityId(wd.cityId);
+    if (wd.zoneId) setTimeout(() => location.setSelectedZoneId(wd.zoneId), 300);
     setEditWorker(worker);
   };
 
@@ -107,9 +113,17 @@ const WorkersTab: React.FC = () => {
     if (!editWorker) return;
     setSavingEdit(true);
     try {
+      // Build zone display name from selected zone
+      const selectedZone = location.zones.find(z => z.id === location.selectedZoneId);
+      const selectedWard = location.wards.find(w => w.id === location.selectedWardId);
+      const zoneName = selectedZone ? selectedZone.name : editForm.assignedZone;
       await updateDoc(doc(db, 'users', editWorker.id), {
         name: editForm.name,
-        assignedZone: editForm.assignedZone,
+        assignedZone: zoneName,
+        cityId: location.selectedCityId || '',
+        zoneId: location.selectedZoneId || '',
+        wardId: location.selectedWardId || '',
+        wardName: selectedWard?.name || '',
         workerType: editForm.workerType,
         phone: editForm.phone,
         updatedAt: serverTimestamp(),
@@ -448,10 +462,24 @@ const WorkersTab: React.FC = () => {
                 <input type="text" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">Assigned Zone</label>
-                <select value={editForm.assignedZone} onChange={e => setEditForm(f => ({ ...f, assignedZone: e.target.value }))} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white">
-                  <option value="">Unassigned</option>
-                  {['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Zone E', 'Zone F'].map(z => <option key={z} value={z}>{z}</option>)}
+                <label className="text-sm font-medium text-gray-700">City</label>
+                <select value={location.selectedCityId} onChange={e => location.setSelectedCityId(e.target.value)} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white">
+                  <option value="">Select City</option>
+                  {location.cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Zone</label>
+                <select value={location.selectedZoneId} onChange={e => location.setSelectedZoneId(e.target.value)} disabled={!location.selectedCityId} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white disabled:opacity-50 disabled:cursor-not-allowed">
+                  <option value="">Select Zone</option>
+                  {location.zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Ward</label>
+                <select value={location.selectedWardId} onChange={e => location.setSelectedWardId(e.target.value)} disabled={!location.selectedZoneId} className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-white disabled:opacity-50 disabled:cursor-not-allowed">
+                  <option value="">Select Ward</option>
+                  {location.wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">

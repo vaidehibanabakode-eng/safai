@@ -4,7 +4,6 @@ import {
   CheckCircle, Loader2, MapPin, Calendar, Mail, HardHat,
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { useLanguage } from '../../../contexts/LanguageContext';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
@@ -17,12 +16,12 @@ interface Worker {
   assignedZone: string;
   workerType: string;
   designation: string;
+  wardName: string;
   status: 'Active' | 'Inactive';
   createdAt: any;
 }
 
 const WorkerManagementTab: React.FC = () => {
-  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -50,6 +49,7 @@ const WorkerManagementTab: React.FC = () => {
           assignedZone: data.assignedZone || '',
           workerType: data.workerType || '',
           designation: data.designation || '',
+          wardName: data.wardName || '',
           status: data.status || 'Active',
           createdAt: data.createdAt,
         });
@@ -226,8 +226,8 @@ const WorkerManagementTab: React.FC = () => {
                   <tr className="text-left text-xs uppercase tracking-wider text-gray-500 bg-gray-50/50">
                     <th className="px-6 py-3 font-semibold">Worker</th>
                     <th className="px-6 py-3 font-semibold">Zone</th>
+                    <th className="px-6 py-3 font-semibold">Ward</th>
                     <th className="px-6 py-3 font-semibold">Type</th>
-                    <th className="px-6 py-3 font-semibold">Designation</th>
                     <th className="px-6 py-3 font-semibold">Joined</th>
                     <th className="px-6 py-3 font-semibold">Status</th>
                     <th className="px-6 py-3 font-semibold text-right">Actions</th>
@@ -254,13 +254,13 @@ const WorkerManagementTab: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-sm ${worker.workerType ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
-                          {worker.workerType || '—'}
+                        <span className={`text-sm ${worker.wardName ? 'text-gray-700' : 'text-gray-400'}`}>
+                          {worker.wardName || '—'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-sm ${worker.designation ? 'text-gray-700' : 'text-gray-400'}`}>
-                          {worker.designation || '—'}
+                        <span className={`text-sm ${worker.workerType ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
+                          {worker.workerType || '—'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">{formatDate(worker.createdAt)}</td>
@@ -408,6 +408,12 @@ const WorkerManagementTab: React.FC = () => {
                   <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
                   <span className="text-gray-600">{selectedWorker.assignedZone || 'No zone assigned'}</span>
                 </div>
+                {selectedWorker.wardName && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-gray-400 flex-shrink-0 w-4 h-4 flex items-center justify-center text-xs">📋</span>
+                    <span className="text-gray-600">{selectedWorker.wardName}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-3 text-sm">
                   <HardHat className="w-4 h-4 text-gray-400 flex-shrink-0" />
                   <span className="text-gray-600">{selectedWorker.workerType || 'No type assigned'}</span>

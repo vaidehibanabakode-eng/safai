@@ -4,7 +4,6 @@ import {
   CheckCircle, Loader2, MapPin, Calendar, Mail,
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { useLanguage } from '../../../contexts/LanguageContext';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
@@ -22,7 +21,6 @@ interface Citizen {
 }
 
 const CitizenManagementTab: React.FC = () => {
-  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [showFilterMenu, setShowFilterMenu] = useState(false);

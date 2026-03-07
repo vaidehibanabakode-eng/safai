@@ -10,6 +10,7 @@ import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, server
 import { db, auth } from '../../../lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
+import { useAllZones } from '../../../hooks/useCascadingLocation';
 
 interface Admin {
   id: string;
@@ -23,6 +24,7 @@ interface Admin {
 
 const AdminManagementTab: React.FC = () => {
   const { t } = useLanguage();
+  const allZones = useAllZones();
   const [showAddModal, setShowAddModal]           = useState(false);
   const [searchTerm, setSearchTerm]               = useState('');
   const [filterStatus, setFilterStatus]           = useState<string>('All');
@@ -508,7 +510,8 @@ const AdminManagementTab: React.FC = () => {
                         onChange={(e) => setFormData({ ...formData, area: e.target.value })}
                         className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all"
                       >
-                        {['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Zone E', 'Zone F'].map(z => <option key={z}>{z}</option>)}
+                        <option value="">Select Zone</option>
+                        {allZones.map(z => <option key={z.id} value={z.name}>{z.name}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1.5">
@@ -591,7 +594,8 @@ const AdminManagementTab: React.FC = () => {
                         onChange={(e) => setFormData({ ...formData, area: e.target.value })}
                         className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all"
                       >
-                        {['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Zone E', 'Zone F'].map(z => <option key={z}>{z}</option>)}
+                        <option value="">Select Zone</option>
+                        {allZones.map(z => <option key={z.id} value={z.name}>{z.name}</option>)}
                       </select>
                     </div>
                     <div className="space-y-1.5">
