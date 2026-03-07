@@ -19,7 +19,7 @@ interface SystemStats {
     loading: boolean;
 }
 
-const OverviewTab: React.FC = () => {
+const OverviewTab: React.FC<{ onNavigate?: (tab: string) => void }> = ({ onNavigate }) => {
     const { t } = useLanguage();
     const [stats, setStats] = useState<SystemStats>({
         totalComplaints: 0,
@@ -212,13 +212,18 @@ const OverviewTab: React.FC = () => {
             </div>
 
             {/* Secondary Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Admins', value: stats.totalAdmins, icon: Shield, cls: 'bg-amber-50 text-amber-700 border-amber-100' },
-                    { label: 'Pending Complaints', value: stats.pendingComplaints, icon: Clock, cls: 'bg-red-50 text-red-700 border-red-100' },
-                    { label: 'Registered Citizens', value: stats.totalCitizens, icon: Users, cls: 'bg-cyan-50 text-cyan-700 border-cyan-100' },
+                    { label: 'Total Admins', value: stats.totalAdmins, icon: Shield, cls: 'bg-amber-50 text-amber-700 border-amber-100', tab: 'admins' },
+                    { label: 'Total Workers', value: stats.totalWorkers, icon: Users, cls: 'bg-purple-50 text-purple-700 border-purple-100', tab: 'workers' },
+                    { label: 'Pending Complaints', value: stats.pendingComplaints, icon: Clock, cls: 'bg-red-50 text-red-700 border-red-100', tab: '' },
+                    { label: 'Registered Citizens', value: stats.totalCitizens, icon: Users, cls: 'bg-cyan-50 text-cyan-700 border-cyan-100', tab: 'citizens' },
                 ].map((c, i) => (
-                    <div key={i} className={`rounded-2xl p-5 border flex items-center gap-4 ${c.cls}`}>
+                    <div
+                        key={i}
+                        className={`rounded-2xl p-5 border flex items-center gap-4 ${c.cls} ${c.tab && onNavigate ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+                        onClick={() => c.tab && onNavigate?.(c.tab)}
+                    >
                         <div className="p-2 rounded-xl bg-white/60 flex-shrink-0">
                             <c.icon className="w-5 h-5" />
                         </div>

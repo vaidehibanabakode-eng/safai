@@ -8,6 +8,11 @@ import StatCard from '../../common/StatCard';
 import { collection, query, where, onSnapshot, getDocs, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
+interface AttendanceStatus {
+  checkIn?: string;
+  checkOut?: string;
+}
+
 interface WorkerData {
   id: string;
   name: string;
@@ -37,6 +42,7 @@ const WorkersTab: React.FC = () => {
   const [showAddInfo, setShowAddInfo] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', assignedZone: '', workerType: '', phone: '' });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [todayAttendance, setTodayAttendance] = useState<Record<string, AttendanceStatus>>({});
 
   useEffect(() => {
     // Query for both capitalized and lowercase role values to catch all workers
@@ -50,6 +56,23 @@ const WorkersTab: React.FC = () => {
       setLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Real-time listener for today's attendance
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const q = query(collection(db, 'attendance'), where('date', '==', today));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const map: Record<string, AttendanceStatus> = {};
+      snapshot.forEach((d) => {
+        const data = d.data();
+        if (data.workerId) {
+          map[data.workerId] = { checkIn: data.checkIn, checkOut: data.checkOut };
+        }
+      });
+      setTodayAttendance(map);
+    });
+    return () => unsub();
   }, []);
 
   const openDetails = async (worker: WorkerData) => {
@@ -73,6 +96,7 @@ const WorkersTab: React.FC = () => {
   };
 
   const uniqueZones = new Set(workers.map(w => w.assignedZone).filter(Boolean)).size;
+  const activeNow = Object.values(todayAttendance).filter(a => a.checkIn && !a.checkOut).length;
 
   const handleEditWorker = (worker: WorkerData) => {
     setEditForm({ name: worker.name, assignedZone: worker.assignedZone || '', workerType: worker.workerType || '', phone: worker.phone || '' });
@@ -134,10 +158,10 @@ const WorkersTab: React.FC = () => {
           color="blue"
         />
         <StatCard
-          title="Registered"
-          value={loading ? '...' : workers.length.toString()}
+          title="On Duty Now"
+          value={loading ? '...' : activeNow.toString()}
           icon={<UserCheck className="w-6 h-6" />}
-          trend={{ value: 'Synced', isPositive: true }}
+          trend={{ value: 'Checked in today', isPositive: activeNow > 0 }}
           color="green"
         />
         <StatCard
@@ -207,9 +231,28 @@ const WorkersTab: React.FC = () => {
                       {worker.phone && <div className="text-xs text-gray-400">{worker.phone}</div>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2.5 py-1 text-[10px] font-bold uppercase rounded-full bg-green-100 text-green-700 tracking-wider">
-                        Registered
-                      </span>
+                      {(() => {
+                        const att = todayAttendance[worker.id];
+                        if (att?.checkIn && !att?.checkOut) {
+                          return (
+                            <span className="inline-flex px-2.5 py-1 text-[10px] font-bold uppercase rounded-full bg-green-100 text-green-700 tracking-wider">
+                              On Duty
+                            </span>
+                          );
+                        } else if (att?.checkIn && att?.checkOut) {
+                          return (
+                            <span className="inline-flex px-2.5 py-1 text-[10px] font-bold uppercase rounded-full bg-blue-100 text-blue-700 tracking-wider">
+                              Shift Done
+                            </span>
+                          );
+                        } else {
+                          return (
+                            <span className="inline-flex px-2.5 py-1 text-[10px] font-bold uppercase rounded-full bg-gray-100 text-gray-500 tracking-wider">
+                              Off Duty
+                            </span>
+                          );
+                        }
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">

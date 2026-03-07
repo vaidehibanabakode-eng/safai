@@ -4,7 +4,7 @@ import {
   CheckCircle, Clock, TrendingUp, UserCheck,
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 
 interface OverviewTabProps {
@@ -26,6 +26,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
     resolvedComplaints: 0,
     inProgress:         0,
     activeWorkers:      0,
+    totalWorkers:       0,
     citizens:           0,
     loading:            true,
   });
@@ -58,7 +59,17 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
     // ── 2. Workers count ───────────────────────────────────────────────────
     const unsubscribeWorkers = onSnapshot(
       query(collection(db, 'users'), where('role', 'in', ['Worker', 'worker'])),
-      (snapshot) => setStats(prev => ({ ...prev, activeWorkers: snapshot.docs.length, loading: false }))
+      (snapshot) => setStats(prev => ({ ...prev, totalWorkers: snapshot.docs.length, loading: false }))
+    );
+
+    // ── 2b. Active workers today (checked in) ──────────────────────────────
+    const today = new Date().toISOString().slice(0, 10);
+    const unsubscribeAttendance = onSnapshot(
+      query(collection(db, 'attendance'), where('date', '==', today)),
+      (snapshot) => {
+        const activeCount = snapshot.docs.filter(d => d.data().checkIn && !d.data().checkOut).length;
+        setStats(prev => ({ ...prev, activeWorkers: activeCount }));
+      }
     );
 
     // ── 3. Citizens count ─────────────────────────────────────────────────
@@ -67,7 +78,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
       (snapshot) => setStats(prev => ({ ...prev, citizens: snapshot.docs.length }))
     );
 
-    return () => { unsubscribeComplaints(); unsubscribeWorkers(); unsubscribeCitizens(); };
+    return () => { unsubscribeComplaints(); unsubscribeWorkers(); unsubscribeAttendance(); unsubscribeCitizens(); };
   }, []);
 
   const resolutionRate = stats.totalComplaints > 0
@@ -132,7 +143,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigate }) => {
           title="Active Workers"
           value={stats.loading ? '...' : stats.activeWorkers.toString()}
           icon={<Users className="w-6 h-6" />}
-          trend={{ value: 'On field', isPositive: true }}
+          trend={{ value: `${stats.totalWorkers} registered`, isPositive: stats.activeWorkers > 0 }}
           color="purple"
         />
       </div>

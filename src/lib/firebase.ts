@@ -3,7 +3,6 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported, Messaging } from 'firebase/messaging';
 
 // Your web app's Firebase configuration
@@ -24,7 +23,6 @@ export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : nul
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
-export const storage = getStorage(app);
 
 // Messaging – only works in browsers that support it (lazy-initialized)
 let _messaging: Messaging | null = null;

@@ -48,7 +48,7 @@ const SalaryTab: React.FC<SalaryTabProps> = ({ onNavigate }) => {
         try {
             // 1. Fetch all workers
             const workersSnap = await getDocs(
-                query(collection(db, 'users'), where('role', '==', 'Worker'))
+                query(collection(db, 'users'), where('role', 'in', ['Worker', 'worker']))
             );
 
             // 2. For each worker, count completed tasks this month
@@ -62,12 +62,12 @@ const SalaryTab: React.FC<SalaryTabProps> = ({ onNavigate }) => {
                 const workerData = workerDoc.data();
                 const workerId = workerDoc.id;
 
-                // Count completed assignments this month
+                // Count completed/verified assignments this month
                 const assignSnap = await getDocs(
                     query(
                         collection(db, 'assignments'),
                         where('workerId', '==', workerId),
-                        where('workerStatus', '==', 'COMPLETED')
+                        where('workerStatus', 'in', ['COMPLETED', 'VERIFIED'])
                     )
                 );
 

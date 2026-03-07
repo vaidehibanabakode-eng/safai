@@ -6,8 +6,10 @@ import {
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../../lib/firebase';
+import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, getDocs, setDoc } from 'firebase/firestore';
+import { db, auth } from '../../../lib/firebase';
+import { createUserWithEmailAndPassword, updateProfile, signInWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { initializeApp, deleteApp } from 'firebase/app';
 
 interface Admin {
   id: string;
@@ -132,7 +134,7 @@ const AdminManagementTab: React.FC = () => {
       showToast(t('alert_fill_required'), false);
       return;
     }
-    if (isEditing) {
+    if (isEditing && isEditing !== '__new_instructions__') {
       // ── Update existing admin in Firestore ─────────────────────────────────
       setSaving(true);
       try {
@@ -151,11 +153,91 @@ const AdminManagementTab: React.FC = () => {
         setSaving(false);
       }
     } else {
-      // ── New admin: cannot create Firebase Auth from client ─────────────────
-      // Show the instructions panel instead of creating an account
-      setShowAddModal(false);
-      setShowAddModal(true);   // keep the modal open in "instructions" state
-      setIsEditing('__new_instructions__');
+      // ── New admin: promote existing user or create new account ────────────
+      if (!formData.email.trim()) {
+        showToast('Please enter an email address.', false);
+        return;
+      }
+      if (!formData.password.trim() || formData.password.length < 6) {
+        // Check if user already exists - if so, promote without password
+        setSaving(true);
+        try {
+          const userQuery = query(collection(db, 'users'), where('email', '==', formData.email.trim()));
+          const userSnap = await getDocs(userQuery);
+          if (!userSnap.empty) {
+            const userDoc = userSnap.docs[0];
+            await updateDoc(doc(db, 'users', userDoc.id), {
+              role: 'Admin',
+              name: formData.name,
+              assignedZone: formData.area,
+              adminLevel: formData.role,
+              status: formData.status,
+              updatedAt: serverTimestamp(),
+            });
+            showToast(`${formData.name} has been promoted to Admin!`);
+            setShowAddModal(false);
+            setIsEditing(null);
+          } else {
+            showToast('No account found with this email. Enter a password (min 6 chars) to create a new account.', false);
+          }
+        } catch (err: any) {
+          showToast(err.message || 'Failed to promote user.', false);
+        } finally {
+          setSaving(false);
+        }
+        return;
+      }
+
+      // Create a brand new admin account using a secondary Firebase app
+      // so the superadmin's session is NOT interrupted.
+      setSaving(true);
+      let secondaryApp;
+      try {
+        // Spin up a throw-away Firebase app to create the Auth user
+        const config = auth.app.options;
+        secondaryApp = initializeApp(config, `_adminCreate_${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+
+        const newCred = await createUserWithEmailAndPassword(secondaryAuth, formData.email.trim(), formData.password);
+        const newUser = newCred.user;
+        await updateProfile(newUser, { displayName: formData.name });
+
+        // Save admin profile to Firestore (uses main db instance — still authenticated as superadmin)
+        await setDoc(doc(db, 'users', newUser.uid), {
+          uid: newUser.uid,
+          email: formData.email.trim(),
+          name: formData.name,
+          role: 'Admin',
+          assignedZone: formData.area,
+          adminLevel: formData.role,
+          status: formData.status,
+          createdAt: serverTimestamp(),
+          rewardPoints: 0,
+          phone: '',
+          address: '',
+          memberSince: serverTimestamp(),
+          preferences: { notifications: true, language: 'en' },
+        });
+
+        // Sign out from secondary app so it can be cleaned up
+        await secondaryAuth.signOut();
+
+        showToast(`Admin account created for ${formData.name}! They can login with their email and password.`);
+        setShowAddModal(false);
+        setIsEditing(null);
+      } catch (err: any) {
+        if (err.code === 'auth/email-already-in-use') {
+          showToast('An account with this email already exists. Leave password empty to promote them.', false);
+        } else {
+          showToast(err.message || 'Failed to create admin account.', false);
+        }
+      } finally {
+        // Clean up the secondary app
+        if (secondaryApp) {
+          try { await deleteApp(secondaryApp); } catch { /* ignore */ }
+        }
+        setSaving(false);
+      }
     }
   };
 
@@ -366,28 +448,98 @@ const AdminManagementTab: React.FC = () => {
               </button>
             </div>
 
-            {/* ── New admin: show instructions ──────────────────────────── */}
+            {/* ── New admin: show creation form ──────────────────────────── */}
             {(!isEditing || isEditing === '__new_instructions__') ? (
-              <div className="p-6 space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                  <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-blue-800">
-                    <p className="font-semibold mb-1">How to onboard a new Admin</p>
-                    <ol className="list-decimal list-inside space-y-1 text-blue-700">
-                      <li>Have them create an account via the <strong>Sign Up</strong> page</li>
-                      <li>Once registered, find them in the <strong>Users</strong> list in Firebase Console</li>
-                      <li>Set their Firestore <code className="bg-blue-100 px-1 rounded">role</code> field to <code className="bg-blue-100 px-1 rounded">Admin</code></li>
-                      <li>They will appear here automatically and can be assigned a zone</li>
-                    </ol>
+              <>
+                <div className="p-6 space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
+                    <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-semibold mb-1">Add a New Administrator</p>
+                      <p className="text-blue-700">Enter an existing user's email to promote them, or fill in all fields including password to create a new account.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">{t('label_full_name')}</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      placeholder={t('placeholder_name')}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">{t('label_email')}</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-gray-700">{t('label_new_password')}</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="w-full pl-10 pr-10 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                        placeholder="Leave empty to promote existing user"
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400">Leave empty to promote an existing registered user. Min 6 characters for new accounts.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700">{t('label_assigned_zone')}</label>
+                      <select
+                        value={formData.area}
+                        onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all"
+                      >
+                        {['Zone A', 'Zone B', 'Zone C', 'Zone D', 'Zone E', 'Zone F'].map(z => <option key={z}>{z}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-gray-700">{t('label_role_level')}</label>
+                      <select
+                        value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all"
+                      >
+                        <option>Senior Admin</option>
+                        <option>Zone Admin</option>
+                        <option>Viewer</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 text-center">Direct account creation requires server-side Firebase Admin SDK for security reasons.</p>
-                <div className="flex justify-end">
-                  <button onClick={() => { setShowAddModal(false); setIsEditing(null); }} className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors">
-                    Got it
+
+                <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+                  <button onClick={() => { setShowAddModal(false); setIsEditing(null); }} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">
+                    {t('btn_cancel')}
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={saving}
+                    className="px-6 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-all shadow-md hover:shadow-lg disabled:opacity-60 flex items-center gap-2"
+                  >
+                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Add Admin
                   </button>
                 </div>
-              </div>
+              </>
             ) : (
               /* ── Edit existing admin ──────────────────────────────────── */
               <>

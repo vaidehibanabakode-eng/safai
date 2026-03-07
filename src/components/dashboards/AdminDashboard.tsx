@@ -56,7 +56,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
       case 'training':
         return <TrainingSystem user={user} />;
       case 'salary': return <SalaryTab onNavigate={setActiveTab} />;
-      case 'settings': return <SettingsTab />;
+      case 'settings': return <SettingsTab user={user} />;
       case 'profile': return <ProfilePage user={user} />;
       default: return <OverviewTab onNavigate={setActiveTab} />;
     }

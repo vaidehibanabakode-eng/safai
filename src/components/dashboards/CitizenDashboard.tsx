@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { addDoc, collection, serverTimestamp, query, where, onSnapshot, doc, updateDoc, orderBy, limit } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
+import { uploadToCloudinary } from '../../lib/cloudinary';
 import {
   ClipboardList,
   Calendar,
@@ -457,22 +457,32 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
       // The schema currently supports a single imageUrl, so we take the first.
       if (photos.length > 0 && photos[0].file) {
         const file = photos[0].file;
-        const fileRef = ref(storage, `complaints/${user.id}_${Date.now()}_${file.name}`);
-        // Add 30s timeout to upload operations
-        await withTimeout(uploadBytes(fileRef, file), 30000, 'Image upload timed out. Please check your connection and try again.');
-        imageUrl = await withTimeout(getDownloadURL(fileRef), 10000, 'Failed to get image URL. Please try again.');
+        const result = await withTimeout(
+          uploadToCloudinary(file, { folder: 'complaints' }),
+          30000,
+          'Image upload timed out. Please check your connection and try again.'
+        );
+        imageUrl = result.secure_url;
       }
 
-      const complaintData = {
+      // Grab GPS coords from the first geo-tagged photo (if any)
+      const geoPhoto = photos.find(p => p.lat != null);
+
+      const complaintData: Record<string, any> = {
         title: issueType,
         description: description.trim(),
         category: issueType,
         location: location,
         status: 'SUBMITTED',
         citizenId: user.id,
+        citizenName: user.name || '',
         imageUrl: imageUrl,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        ...(geoPhoto?.lat != null && geoPhoto?.lng != null && {
+          lat: geoPhoto.lat,
+          lng: geoPhoto.lng,
+        }),
       };
 
       await withTimeout(addDoc(collection(db, 'complaints'), complaintData), 15000, 'Failed to save complaint. Please try again.');

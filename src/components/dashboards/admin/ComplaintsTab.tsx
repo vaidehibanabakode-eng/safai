@@ -84,7 +84,7 @@ const ComplaintsTab: React.FC = () => {
     // Fetch workers once
     useEffect(() => {
         const fetchWorkers = async () => {
-            const q = query(collection(db, 'users'), where('role', '==', 'Worker'));
+            const q = query(collection(db, 'users'), where('role', 'in', ['Worker', 'worker']));
             const snap = await getDocs(q);
             const fetchedWorkers: Worker[] = [];
             snap.forEach(docSnap => {

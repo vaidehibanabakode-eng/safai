@@ -16,8 +16,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
 
 import { collection, query, where, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
+import { uploadToCloudinary } from '../../lib/cloudinary';
 
 interface WorkerDashboardProps {
   user: User;
@@ -59,6 +59,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
     geoLoading?: boolean;
   }
   const [proofPhotos, setProofPhotos] = useState<GeoPhoto[]>([]);
+  const [proofDescription, setProofDescription] = useState('');
   const proofCameraInputRef = useRef<HTMLInputElement>(null);
   const proofGalleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,11 +94,11 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
           }
         }
 
-        // Sort: IN_PROGRESS first, then ASSIGNED, then COMPLETED
+        // Sort: IN_PROGRESS first, then ASSIGNED, then COMPLETED, then VERIFIED
         fetchedTasks.sort((a, b) => {
-          const rank = { 'IN_PROGRESS': 1, 'ASSIGNED': 2, 'COMPLETED': 3 };
-          const rankA = rank[a.workerStatus as keyof typeof rank] || 4;
-          const rankB = rank[b.workerStatus as keyof typeof rank] || 4;
+          const rank: Record<string, number> = { 'IN_PROGRESS': 1, 'ASSIGNED': 2, 'COMPLETED': 3, 'VERIFIED': 4 };
+          const rankA = rank[a.workerStatus] || 5;
+          const rankB = rank[b.workerStatus] || 5;
           return rankA - rankB;
         });
 
@@ -184,15 +185,15 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
     try {
       // 1. Upload first photo (can loop for all if needed, but schema only has 1 imageUrl currently)
       const file = proofPhotos[0].file; // Pick the first available photo
-      const fileRef = ref(storage, `evidence/${user.id}_${Date.now()}_${file.name}`);
-      await uploadBytes(fileRef, file);
-      const imageUrl = await getDownloadURL(fileRef);
+      const result = await uploadToCloudinary(file, { folder: 'evidence' });
+      const imageUrl = result.secure_url;
 
       // 2. Create evidence record
       await addDoc(collection(db, 'completion_evidence'), {
         complaintId: task.complaintId,
         workerId: user.id,
         imageUrl,
+        description: proofDescription.trim(),
         notes: `Completed at lat: ${proofPhotos[0].lat}, lng: ${proofPhotos[0].lng}`,
         createdAt: serverTimestamp()
       });
@@ -205,6 +206,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
 
       toastSuccess("Proof submitted successfully! Awaiting Admin approval.");
       setProofPhotos([]);
+      setProofDescription('');
       setSelectedTaskId(null);
       setActiveTab('tasks');
     } catch (error) {
@@ -271,7 +273,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
 
   const sidebarItems = [
     { icon: <ClipboardList className="w-5 h-5" />, label: t('my_tasks'), active: activeTab === 'tasks', onClick: () => setActiveTab('tasks') },
-    { icon: <Camera className="w-5 h-5" />, label: t('submit_proof'), active: activeTab === 'proof', onClick: () => setActiveTab('proof') },
+    { icon: <Camera className="w-5 h-5" />, label: t('submit_proof'), active: activeTab === 'proof', onClick: () => { const inProgress = tasks.find(t => t.workerStatus === 'IN_PROGRESS'); if (inProgress && !selectedTaskId) { setSelectedTaskId(inProgress.assignmentId); setProofPhotos([]); } setActiveTab('proof'); } },
     { icon: <CheckCircle className="w-5 h-5" />, label: t('attendance'), active: activeTab === 'attendance', onClick: () => setActiveTab('attendance') },
     { icon: <QrCode className="w-5 h-5" />, label: t('digital_id'), active: activeTab === 'digitalid', onClick: () => setActiveTab('digitalid') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
@@ -282,7 +284,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
   const renderContent = () => {
     switch (activeTab) {
       case 'tasks':
-        const completedCount = tasks.filter(t => t.workerStatus === 'COMPLETED').length;
+        const completedCount = tasks.filter(t => t.workerStatus === 'COMPLETED' || t.workerStatus === 'VERIFIED').length;
         const inProgressCount = tasks.filter(t => t.workerStatus === 'IN_PROGRESS').length;
 
         return (
@@ -311,16 +313,17 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
                 ) : (
                   <div className="space-y-4">
                     {tasks.map((task) => (
-                      <div key={task.assignmentId} className={`border ${task.workerStatus === 'COMPLETED' ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md transition-shadow`}>
+                      <div key={task.assignmentId} className={`border ${task.workerStatus === 'COMPLETED' || task.workerStatus === 'VERIFIED' ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md transition-shadow`}>
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <span className="font-semibold text-gray-900 line-clamp-1 max-w-[200px]">{task.title}</span>
                           </div>
-                          <span className={`px-3 py-1 text-[10px] uppercase tracking-wider font-bold rounded-full ${task.workerStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                          <span className={`px-3 py-1 text-[10px] uppercase tracking-wider font-bold rounded-full ${task.workerStatus === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' :
+                            task.workerStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                             task.workerStatus === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                            {task.workerStatus.replace('_', ' ')}
+                            {task.workerStatus === 'VERIFIED' ? 'Verified' : task.workerStatus.replace('_', ' ')}
                           </span>
                         </div>
                         <div className="mb-4">
@@ -350,9 +353,9 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
                             </button>
                           )}
 
-                          {task.workerStatus === 'COMPLETED' && (
+                          {(task.workerStatus === 'COMPLETED' || task.workerStatus === 'VERIFIED') && (
                             <span className="text-sm font-medium text-green-600 flex items-center gap-1">
-                              <CheckCircle className="w-4 h-4" /> Done
+                              <CheckCircle className="w-4 h-4" /> {task.workerStatus === 'VERIFIED' ? 'Verified ✓' : 'Awaiting Review'}
                             </span>
                           )}
                         </div>
@@ -375,25 +378,123 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
               <p className="text-gray-500">Verify your task completion with geo-tagged photos</p>
             </div>
 
+            {/* Hidden Inputs - always rendered so refs work */}
+            <input ref={proofCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleProofPhotoChange} />
+            <input ref={proofGalleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleProofPhotoChange} />
+
             {!selectedTaskId ? (
-              <div className="bg-white p-12 text-center rounded-2xl border border-gray-200">
-                <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900">No active task selected</h3>
-                <p className="text-gray-500 mt-2">Take a photo of your completed work as proof.</p>
-                <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-                  <button
-                    onClick={() => proofCameraInputRef.current?.click()}
-                    className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
-                  >
-                    <Camera className="w-5 h-5" /> Open Camera
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('tasks')}
-                    className="px-6 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200"
-                  >
-                    Select a Task First
-                  </button>
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
+                {/* Photo Upload Section */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Photo Evidence
+                    <span className="ml-2 text-xs font-normal text-gray-400">({proofPhotos.length}/5)</span>
+                  </label>
+
+                  {/* Photo preview grid */}
+                  {proofPhotos.length > 0 && (
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
+                      {proofPhotos.map((p, i) => (
+                        <div key={i} className="relative group">
+                          <img
+                            src={p.preview}
+                            alt={`Proof ${i + 1}`}
+                            className="w-full h-20 object-cover rounded-lg border border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeProofPhoto(i)}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          {p.geoLoading ? (
+                            <div className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-black/60 text-white text-[9px] font-medium px-1 py-0.5 rounded">
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                              <span>GPS…</span>
+                            </div>
+                          ) : p.lat ? (
+                            <div className="absolute bottom-1 left-1 flex items-center gap-0.5 bg-green-600/90 text-white text-[9px] font-medium px-1 py-0.5 rounded max-w-[95%] overflow-hidden">
+                              <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
+                              <span className="truncate">{p.lat.toFixed(4)}, {p.lng?.toFixed(4)}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload buttons */}
+                  {proofPhotos.length < 5 && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center">
+                      <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-600 mb-1">Take a photo of your completed work</p>
+                      <p className="text-xs text-gray-400 mb-4">Each photo is automatically geo-tagged with your GPS location</p>
+                      <div className="flex gap-3 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => proofCameraInputRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                        >
+                          <Camera className="w-4 h-4" /> Camera
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => proofGalleryInputRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                        >
+                          <span>🖼️</span> Gallery
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={proofDescription}
+                    onChange={(e) => setProofDescription(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
+                    placeholder="Describe the work you completed..."
+                  />
+                </div>
+
+                {/* Submit */}
+                <button
+                  onClick={async () => {
+                    if (proofPhotos.length === 0) { toastError('Please upload at least one photo.'); return; }
+                    setIsSubmittingProof(true);
+                    try {
+                      const file = proofPhotos[0].file;
+                      const result = await uploadToCloudinary(file, { folder: 'evidence' });
+                      await addDoc(collection(db, 'completion_evidence'), {
+                        workerId: user.id,
+                        imageUrl: result.secure_url,
+                        description: proofDescription.trim(),
+                        notes: `Completed at lat: ${proofPhotos[0].lat}, lng: ${proofPhotos[0].lng}`,
+                        createdAt: serverTimestamp()
+                      });
+                      toastSuccess('Proof submitted successfully!');
+                      setProofPhotos([]);
+                      setProofDescription('');
+                    } catch (error) {
+                      console.error('Error submitting proof:', error);
+                      toastError('Failed to submit proof. Please try again.');
+                    } finally {
+                      setIsSubmittingProof(false);
+                    }
+                  }}
+                  disabled={proofPhotos.length === 0 || isSubmittingProof}
+                  className="w-full flex justify-center items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-green-200 hover:shadow-green-300 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                >
+                  {isSubmittingProof ? <Loader2 className="w-6 h-6 animate-spin" /> : <Camera className="w-5 h-5" />}
+                  {isSubmittingProof ? 'Submitting...' : 'Submit Proof'}
+                </button>
               </div>
             ) : (
               <div className="grid lg:grid-cols-3 gap-6">
@@ -521,9 +622,17 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
                       </div>
                     )}
 
-                    {/* Hidden Inputs */}
-                    <input ref={proofCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleProofPhotoChange} />
-                    <input ref={proofGalleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleProofPhotoChange} />
+                    {/* Description */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                      <textarea
+                        rows={3}
+                        value={proofDescription}
+                        onChange={(e) => setProofDescription(e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all duration-200"
+                        placeholder="Describe the work you completed..."
+                      />
+                    </div>
 
                     {/* Footer Actions */}
                     <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-gray-100">
@@ -665,7 +774,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
           </div>
         );
       case 'training': return <TrainingSystem user={user} />;
-      case 'settings': return <SettingsTab />;
+      case 'settings': return <SettingsTab user={user} />;
       case 'profile': return <ProfilePage user={user} />;
       default: return null;
     }

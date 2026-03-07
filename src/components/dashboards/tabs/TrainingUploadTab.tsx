@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Video, Download, Loader2, Trash2 } from 'lucide-react';
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, deleteDoc, doc, Timestamp } from 'firebase/firestore';
-import { db, storage } from '../../../lib/firebase';
+import { db } from '../../../lib/firebase';
+import { uploadToCloudinary, deleteFromCloudinary } from '../../../lib/cloudinary';
 import { User } from '../../../App';
 import { useToast } from '../../../contexts/ToastContext';
 
@@ -75,33 +75,22 @@ const TrainingUploadTab: React.FC<TrainingUploadTabProps> = ({ user }) => {
     setUploadProgress(0);
     try {
       const fileType = detectType(selectedFile);
-      const safeFileName = `${Date.now()}_${selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const storageRef = ref(storage, `training-materials/${safeFileName}`);
 
-      await new Promise<void>((resolve, reject) => {
-        const uploadTask = uploadBytesResumable(storageRef, selectedFile);
-        uploadTask.on(
-          'state_changed',
-          (snapshot) => {
-            setUploadProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
-          },
-          reject,
-          async () => {
-            const fileUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            await addDoc(collection(db, 'training_materials'), {
-              title: title.trim(),
-              fileUrl,
-              type: fileType,
-              uploadedBy: user.name || user.email,
-              uploadedById: user.id,
-              fileName: selectedFile.name,
-              fileSize: selectedFile.size,
-              storagePath: `training-materials/${safeFileName}`,
-              createdAt: serverTimestamp(),
-            });
-            resolve();
-          }
-        );
+      const result = await uploadToCloudinary(selectedFile, {
+        folder: 'training-materials',
+        onProgress: (percent) => setUploadProgress(percent),
+      });
+
+      await addDoc(collection(db, 'training_materials'), {
+        title: title.trim(),
+        fileUrl: result.secure_url,
+        type: fileType,
+        uploadedBy: user.name || user.email,
+        uploadedById: user.id,
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        cloudinaryPublicId: result.public_id,
+        createdAt: serverTimestamp(),
       });
 
       toastSuccess('Training material uploaded successfully!');
@@ -119,9 +108,8 @@ const TrainingUploadTab: React.FC<TrainingUploadTabProps> = ({ user }) => {
 
   const handleDelete = async (material: TrainingMaterial) => {
     try {
-      if (material.storagePath) {
-        const storageRef = ref(storage, material.storagePath);
-        await deleteObject(storageRef);
+      if ((material as any).cloudinaryPublicId) {
+        await deleteFromCloudinary((material as any).cloudinaryPublicId);
       }
       await deleteDoc(doc(db, 'training_materials', material.id));
       toastSuccess('Material deleted.');

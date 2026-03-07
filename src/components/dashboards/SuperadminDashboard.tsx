@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   BarChart3,
   Users,
+  UserCheck,
+  HardHat,
   GraduationCap,
   FileText,
   Package,
@@ -13,6 +15,8 @@ import Layout from '../common/Layout';
 import TrainingSystem from '../training/TrainingSystem';
 import OverviewTab from './tabs/OverviewTab';
 import AdminManagementTab from './tabs/AdminManagementTab';
+import CitizenManagementTab from './tabs/CitizenManagementTab';
+import WorkerManagementTab from './tabs/WorkerManagementTab';
 import ReportsTab from './tabs/ReportsTab';
 import InventoryTab from './tabs/InventoryTab';
 import SettingsTab from './tabs/SettingsTab';
@@ -31,6 +35,8 @@ const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, onLogou
   const sidebarItems = [
     { icon: <BarChart3 className="w-5 h-5" />, label: t('overview'), active: activeTab === 'overview', onClick: () => setActiveTab('overview') },
     { icon: <Users className="w-5 h-5" />, label: t('admin_management'), active: activeTab === 'admins', onClick: () => setActiveTab('admins') },
+    { icon: <UserCheck className="w-5 h-5" />, label: 'Citizens', active: activeTab === 'citizens', onClick: () => setActiveTab('citizens') },
+    { icon: <HardHat className="w-5 h-5" />, label: 'Workers', active: activeTab === 'workers', onClick: () => setActiveTab('workers') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('training'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <FileText className="w-5 h-5" />, label: t('reports'), active: activeTab === 'reports', onClick: () => setActiveTab('reports') },
     { icon: <Package className="w-5 h-5" />, label: t('inventory_management'), active: activeTab === 'inventory', onClick: () => setActiveTab('inventory') },
@@ -40,8 +46,10 @@ const SuperadminDashboard: React.FC<SuperadminDashboardProps> = ({ user, onLogou
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'overview':   return <OverviewTab />;
+      case 'overview':   return <OverviewTab onNavigate={setActiveTab} />;
       case 'admins':     return <AdminManagementTab />;
+      case 'citizens':   return <CitizenManagementTab />;
+      case 'workers':    return <WorkerManagementTab />;
       case 'training':   return <TrainingSystem user={user} />;
       case 'reports':    return <ReportsTab />;
       case 'inventory':  return <InventoryTab />;

@@ -37,7 +37,8 @@ const VerificationTab: React.FC = () => {
 
     useEffect(() => {
         // Listen to all COMPLETED assignments
-        const q = query(collection(db, 'assignments'), where('workerStatus', '==', 'COMPLETED'));
+        // Listen to COMPLETED and VERIFIED assignments
+        const q = query(collection(db, 'assignments'), where('workerStatus', 'in', ['COMPLETED', 'VERIFIED']));
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const pending: VerificationEntry[] = [];
             let approved = 0;
@@ -45,6 +46,13 @@ const VerificationTab: React.FC = () => {
 
             for (const assignDoc of snapshot.docs) {
                 const a = assignDoc.data();
+
+                // Already verified — count as approved, skip
+                if (a.workerStatus === 'VERIFIED') {
+                    approved++;
+                    continue;
+                }
+
                 try {
                     // Fetch complaint
                     const complaintSnap = await getDoc(doc(db, 'complaints', a.complaintId));
@@ -105,6 +113,10 @@ const VerificationTab: React.FC = () => {
             await updateDoc(doc(db, 'complaints', entry.complaintId), {
                 status: 'RESOLVED',
                 updatedAt: serverTimestamp(),
+            });
+            await updateDoc(doc(db, 'assignments', entry.assignmentId), {
+                workerStatus: 'VERIFIED',
+                verifiedAt: serverTimestamp(),
             });
             setIsModalOpen(false);
             setSelectedEntry(null);

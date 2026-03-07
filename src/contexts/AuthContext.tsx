@@ -78,17 +78,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             documentSeenOnce = true;
                             console.log('✅ User document found in Firestore:', { uid: user.uid, data: firestoreData });
                         } else if (!documentSeenOnce) {
-                            // First snapshot: doc may not exist yet if signup is still writing.
-                            // Wait briefly before flagging as missing.
-                            console.warn('⏳ User document not found yet, waiting for write to propagate...');
-                            setTimeout(() => {
-                                if (!documentSeenOnce) {
-                                    console.error('❌ NO USER DOCUMENT in Firestore for:', user.uid, user.email);
+                            // First snapshot: doc doesn't exist yet.
+                            // SignupPage writes the profile with the chosen role — give it
+                            // time to land before we overwrite with a default Citizen profile.
+                            documentSeenOnce = true; // prevent duplicate auto-creates
+                            console.warn('⏳ User document not found, waiting for signup write...');
+
+                            setTimeout(async () => {
+                                try {
+                                    // Re-check: SignupPage may have written the doc by now
+                                    const { getDoc: gd, setDoc: sd, serverTimestamp: st } = await import('firebase/firestore');
+                                    const freshSnap = await gd(docRef);
+                                    if (freshSnap.exists()) {
+                                        console.log('✅ Profile appeared after wait — signup write landed.');
+                                        // onSnapshot will pick it up; nothing to do.
+                                        return;
+                                    }
+
+                                    // Still missing — this is likely a direct login for a user
+                                    // whose profile was deleted. Create a safe default.
+                                    console.warn('⚠️ Still no profile after wait — auto-creating Citizen profile.');
+                                    await sd(docRef, {
+                                        uid: user.uid,
+                                        email: user.email || '',
+                                        name: user.displayName || (user.email?.split('@')[0] ?? 'User'),
+                                        role: 'Citizen',
+                                        createdAt: st(),
+                                        memberSince: st(),
+                                        rewardPoints: 0,
+                                        phone: '',
+                                        address: '',
+                                        citizenID: `CIT-${user.uid.slice(-6).toUpperCase()}`,
+                                        assignedZone: '',
+                                        preferences: { notifications: true, language: 'en' },
+                                    });
+                                    console.log('✅ Auto-created Citizen profile for:', user.uid);
+                                } catch (err: unknown) {
+                                    console.error('[AuthContext] Auto-create profile failed:', err);
                                     setNoDocument(true);
                                     setLoading(false);
                                 }
-                            }, 3000);
-                            return; // Don't set profile yet
+                            }, 2000); // wait 2s for SignupPage's setDoc to land
+                            return; // onSnapshot will fire when the doc appears
                         } else {
                             console.error('❌ NO USER DOCUMENT in Firestore for:', user.uid, user.email);
                             setNoDocument(true);

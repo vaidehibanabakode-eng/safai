@@ -18,15 +18,15 @@ service cloud.firestore {
     }
 
     function isSuperadmin() {
-      return isAuthenticated() && getUserRole() == 'superadmin';
+      return isAuthenticated() && (getUserRole() == 'Superadmin' || getUserRole() == 'superadmin');
     }
 
     function isAdmin() {
-      return isAuthenticated() && (getUserRole() == 'admin' || getUserRole() == 'superadmin');
+      return isAuthenticated() && (getUserRole() == 'Admin' || getUserRole() == 'admin' || isSuperadmin());
     }
 
     function isWorker() {
-      return isAuthenticated() && (getUserRole() == 'worker' || getUserRole() == 'admin' || getUserRole() == 'superadmin');
+      return isAuthenticated() && (getUserRole() == 'Worker' || getUserRole() == 'worker' || isAdmin());
     }
 
     // ── `users` collection ────────────────────────────────────────────────────
