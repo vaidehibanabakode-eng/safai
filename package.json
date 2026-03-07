@@ -20,6 +20,8 @@
     "test:superadmin": "playwright test tests/e2e/superadmin.spec.ts",
     "test:champion": "playwright test tests/e2e/champion.spec.ts",
     "test:ai": "playwright test tests/e2e/ai.spec.ts",
+    "test:api": "playwright test tests/e2e/api.spec.ts",
+    "test:api-server": "npx tsx tests/api-server.ts",
     "test:report": "playwright show-report"
   },
   "dependencies": {
