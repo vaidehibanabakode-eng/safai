@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Navigation, Phone, Clock, Filter, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 
 interface Facility {
@@ -181,6 +181,7 @@ export default function RecyclingLocatorTab() {
         </span>
         {!locLoading && !userLoc && (
           <button
+            type="button"
             onClick={getLocation}
             className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
           >
@@ -196,6 +197,7 @@ export default function RecyclingLocatorTab() {
         </p>
         <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={() => setSelectedCategory('All')}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               selectedCategory === 'All'
@@ -210,6 +212,7 @@ export default function RecyclingLocatorTab() {
             const active = selectedCategory === cat;
             return (
               <button
+                type="button"
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
@@ -233,10 +236,10 @@ export default function RecyclingLocatorTab() {
       ) : (
         <div className="space-y-3">
           {filtered.map((f) => (
-            <button
+            <div
               key={f.id}
               onClick={() => setSelectedFacility(selectedFacility?.id === f.id ? null : f)}
-              className="w-full text-left bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
+              className="w-full text-left bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
             >
               <div className="flex items-start gap-3">
                 <span className="text-2xl flex-shrink-0">{TYPE_ICON[f.type]}</span>
@@ -285,6 +288,7 @@ export default function RecyclingLocatorTab() {
                     </a>
                   )}
                   <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); openMaps(f); }}
                     className="flex items-center gap-2 text-sm text-blue-600 font-medium hover:underline"
                   >
@@ -293,7 +297,7 @@ export default function RecyclingLocatorTab() {
                   </button>
                 </div>
               )}
-            </button>
+            </div>
           ))}
         </div>
       )}

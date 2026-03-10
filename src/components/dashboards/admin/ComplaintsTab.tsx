@@ -387,8 +387,9 @@ const ComplaintsTab: React.FC = () => {
 
                                             {activeDropdown === complaint.id && (
                                                 <div className="absolute right-6 top-10 mt-2 w-48 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[50] animate-in fade-in zoom-in duration-200">
-                                                    <div className="py-1" role="menu">
+                                                    <div className="py-1" role="menu" aria-label="Complaint actions">
                                                         <button
+                                                            role="menuitem"
                                                             onClick={() => handleViewDetail(complaint.id, complaint.status)}
                                                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                                                         >
@@ -396,6 +397,7 @@ const ComplaintsTab: React.FC = () => {
                                                         </button>
                                                         {(complaint.status === 'SUBMITTED' || complaint.status === 'UNDER_REVIEW') && (
                                                             <button
+                                                                role="menuitem"
                                                                 onClick={() => openAssignModal(complaint.id)}
                                                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                                                             >
@@ -403,6 +405,7 @@ const ComplaintsTab: React.FC = () => {
                                                             </button>
                                                         )}
                                                         <button
+                                                            role="menuitem"
                                                             onClick={() => handleDelete(complaint.id)}
                                                             className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                                                         >
