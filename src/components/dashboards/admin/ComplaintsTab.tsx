@@ -161,6 +161,23 @@ const ComplaintsTab: React.FC = () => {
                 status: action,
                 updatedAt: serverTimestamp()
             });
+
+            if (action === 'RESOLVED' && selectedComplaintForReview.citizenId) {
+                try {
+                    const userSnap = await getDoc(doc(db, 'users', selectedComplaintForReview.citizenId));
+                    const fcmToken = userSnap.data()?.fcmToken as string | undefined;
+                    if (fcmToken) {
+                        await sendPushNotification(
+                            [fcmToken],
+                            'Issue Resolved! ✅',
+                            'Your reported issue has been resolved. Please rate the work done.'
+                        );
+                    }
+                } catch (notifyErr) {
+                    console.warn('[ComplaintsTab] Push notification failed:', notifyErr);
+                }
+            }
+
             setIsReviewModalOpen(false);
             setSelectedComplaintForReview(null);
         } catch (error) {

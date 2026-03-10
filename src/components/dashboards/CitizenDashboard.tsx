@@ -37,6 +37,7 @@ import TrainingSystem from '../training/TrainingSystem';
 import ProfilePage from '../common/ProfilePage';
 import SettingsTab from './tabs/SettingsTab';
 import WasteScannerTab from './citizen/WasteScannerTab';
+import RecyclingLocatorTab from './citizen/RecyclingLocatorTab';
 import { User } from '../../App';
 import StatCard from '../common/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -520,6 +521,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
     ...(isChampion ? [{ icon: <Trophy className="w-5 h-5 text-yellow-500" />, label: t('champion_hub'), active: activeTab === 'champion', onClick: () => setActiveTab('champion') }] : []),
     { icon: <Truck className="w-5 h-5" />, label: 'Book Collection', active: activeTab === 'collection', onClick: () => setActiveTab('collection') },
     { icon: <ScanLine className="w-5 h-5" />, label: 'Waste Scanner', active: activeTab === 'scanner', onClick: () => setActiveTab('scanner') },
+    { icon: <MapPin className="w-5 h-5" />, label: 'Recycling Locator', active: activeTab === 'locator', onClick: () => setActiveTab('locator') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_education'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <AlertTriangle className="w-5 h-5" />, label: t('nav_report'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
     { icon: <History className="w-5 h-5" />, label: t('nav_track'), active: activeTab === 'track', onClick: () => setActiveTab('track') },
@@ -1041,6 +1043,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
 
       case 'scanner':
         return <WasteScannerTab />;
+      case 'locator':
+        return <RecyclingLocatorTab />;
       case 'collection':
         return <OnDemandCollectionTab userId={user.id} userAddress={user.address || ''} />;
       case 'rewards':

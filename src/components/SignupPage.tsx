@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { UserPlus, ArrowLeft, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
 import { auth, db, googleProvider } from '../lib/firebase';
 
 interface SignupPageProps {
@@ -99,35 +100,59 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
         }
     }; // Missing closing bracket for handleSubmit
 
+    const ROLE_MAP: Record<string, string> = {
+        worker: 'Worker', citizen: 'Citizen', admin: 'Admin',
+        superadmin: 'Superadmin', 'green-champion': 'Green-Champion'
+    };
+
+    // Handle redirect result on mount (mobile fallback)
+    React.useEffect(() => {
+        if (!role) return;
+        const firestoreRole = ROLE_MAP[role] || 'Citizen';
+        getRedirectResult(auth).then(async (result) => {
+            if (!result) return;
+            const user = result.user;
+            const docRef = doc(db, 'users', user.uid);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+                await setDoc(docRef, {
+                    uid: user.uid, email: user.email,
+                    name: user.displayName || 'Google User',
+                    role: firestoreRole, createdAt: serverTimestamp(),
+                    rewardPoints: 0, phone: '', address: '',
+                    citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+                    assignedZone: '', memberSince: serverTimestamp(),
+                    preferences: { notifications: true, language: 'en' }
+                });
+            }
+            onSignupSuccess(user.email || 'Google User');
+        }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const handleGoogleSignup = async () => {
         if (!role) {
-            setError('Please select a role before signing up.');
+            setError('Please select a role before signing up with Google.');
             return;
         }
 
+        const firestoreRole = ROLE_MAP[role] || 'Citizen';
         setError('');
         setIsLoading(true);
         try {
+            // On Capacitor native, popup doesn't work — use redirect
+            if (Capacitor.isNativePlatform()) {
+                await signInWithRedirect(auth, googleProvider);
+                return;
+            }
+
             const userCredential = await signInWithPopup(auth, googleProvider);
             const user = userCredential.user;
 
-            // Store roles in capitalized form for consistent Firestore queries
-            const roleMap: Record<string, string> = {
-                worker: 'Worker',
-                citizen: 'Citizen',
-                admin: 'Admin',
-                superadmin: 'Superadmin',
-                'green-champion': 'Green-Champion'
-            };
-            const firestoreRole = roleMap[role] || 'Citizen';
-            console.log('📝 Google Signup: Saving role to Firestore:', { selectedRole: role, firestoreRole });
-
-            // Check if user already exists in Firestore
             const docRef = doc(db, 'users', user.uid);
             const docSnap = await getDoc(docRef);
 
             if (!docSnap.exists()) {
-                // First time Google Sign in - assign SELECTED role (not always Citizen)
                 await setDoc(docRef, {
                     uid: user.uid,
                     email: user.email,
@@ -140,17 +165,25 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSignupSuccess, onNavigateToLo
                     citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
                     assignedZone: '',
                     memberSince: serverTimestamp(),
-                    preferences: {
-                        notifications: true,
-                        language: 'en'
-                    }
+                    preferences: { notifications: true, language: 'en' }
                 });
             }
 
             onSignupSuccess(user.email || 'Google User');
         } catch (err: any) {
-            console.error('Google Signup Error:', err);
-            setError('Failed to sign up with Google. Please try again.');
+            console.error('Google Signup Error:', err.code, err.message);
+            if (err.code === 'auth/unauthorized-domain') {
+                setError('This domain is not authorized for Google sign-in. Please contact support or use email/password.');
+            } else if (err.code === 'auth/popup-blocked') {
+                try { await signInWithRedirect(auth, googleProvider); }
+                catch { setError('Popup was blocked. Please allow popups for this site and try again.'); }
+            } else if (err.code === 'auth/popup-closed-by-user') {
+                setError('Sign-up was cancelled. Please try again.');
+            } else if (err.code === 'auth/cancelled-popup-request') {
+                // ignore
+            } else {
+                setError(`Google sign-up failed (${err.code || 'unknown'}). Please try again.`);
+            }
         } finally {
             setIsLoading(false);
         }

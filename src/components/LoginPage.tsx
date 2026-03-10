@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { LogIn, ArrowLeft, ShieldCheck, Mail, Lock, Zap, Eye, EyeOff } from 'lucide-react';
 import { User } from '../App';
 import { useLanguage } from '../contexts/LanguageContext';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import { auth, googleProvider } from '../lib/firebase';
 import LanguageSwitcher from './common/LanguageSwitcher';
 
@@ -50,29 +51,56 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
     }
   };
 
+  // Handle redirect result on mount (for mobile/popup-blocked fallback)
+  React.useEffect(() => {
+    getRedirectResult(auth).then(async (result) => {
+      if (!result) return;
+      const user = result.user;
+      const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          uid: user.uid, email: user.email,
+          name: user.displayName || 'Google User',
+          role: 'Citizen', createdAt: serverTimestamp(),
+          rewardPoints: 0, phone: '', address: '',
+          citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
+          assignedZone: '', memberSince: serverTimestamp(),
+          preferences: { notifications: true, language: 'en' }
+        });
+      }
+      onLogin({ id: user.uid, email: user.email || '', name: user.displayName || 'User', role: 'citizen' });
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleGoogleLogin = async () => {
     setError('');
     setIsLoading(true);
     try {
+      // On Capacitor native, popup doesn't work — use redirect
+      if (Capacitor.isNativePlatform()) {
+        await signInWithRedirect(auth, googleProvider);
+        return; // result handled by getRedirectResult on next load
+      }
+
       const userCredential = await signInWithPopup(auth, googleProvider);
       const user = userCredential.user;
 
-      // Check if profile exists, if not create default one
       const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const { db } = await import('../lib/firebase');
 
       const docRef = doc(db, 'users', user.uid);
       const docSnap = await getDoc(docRef);
 
-      // Only create profile if it doesn't exist
-      // If user previously signed up, keep their existing role
       if (!docSnap.exists()) {
-        console.log('📝 Google Login: Creating new user with citizen role');
         await setDoc(docRef, {
           uid: user.uid,
           email: user.email,
           name: user.displayName || 'Google User',
-          role: 'citizen',  // lowercase for consistent comparison
+          role: 'Citizen',  // capitalized to match Firestore schema
           createdAt: serverTimestamp(),
           rewardPoints: 0,
           phone: '',
@@ -80,31 +108,29 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onNavigateToSignup, onBa
           citizenID: `CIT-${Math.floor(Math.random() * 1000000)}`,
           assignedZone: '',
           memberSince: serverTimestamp(),
-          preferences: {
-            notifications: true,
-            language: 'en'
-          }
+          preferences: { notifications: true, language: 'en' }
         });
-      } else {
-        // Profile exists - just update name and email if needed
-        const existingData = docSnap.data();
-        if (existingData.name !== (user.displayName || 'Google User')) {
-          await setDoc(docRef, {
-            ...existingData,
-            name: user.displayName || 'Google User'
-          }, { merge: true });
-        }
       }
 
-      onLogin({
-        id: user.uid,
-        email: user.email || '',
-        name: user.displayName || 'User',
-        role: 'citizen'
-      });
+      onLogin({ id: user.uid, email: user.email || '', name: user.displayName || 'User', role: 'citizen' });
     } catch (err: any) {
-      console.error('Google Login Error:', err);
-      setError('Failed to log in with Google. Please try again.');
+      console.error('Google Login Error:', err.code, err.message);
+      if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized for Google sign-in. Please contact support or use email/password login.');
+      } else if (err.code === 'auth/popup-blocked') {
+        // Fallback to redirect
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch {
+          setError('Popup was blocked. Please allow popups for this site and try again.');
+        }
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in was cancelled. Please try again.');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        // ignore — another popup was opened
+      } else {
+        setError(`Google sign-in failed (${err.code || 'unknown'}). Please try again.`);
+      }
     } finally {
       setIsLoading(false);
     }
