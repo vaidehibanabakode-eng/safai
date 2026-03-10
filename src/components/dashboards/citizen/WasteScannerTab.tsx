@@ -48,7 +48,8 @@ export default function WasteScannerTab() {
     try {
       const imageBase64 = await toBase64(file);
       const mimeType = file.type || 'image/jpeg';
-      const res = await fetch('/api/classify-waste', {
+      const apiBase = (import.meta.env.VITE_API_BASE_URL as string) ?? '';
+      const res = await fetch(`${apiBase}/api/classify-waste`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64, mimeType }),

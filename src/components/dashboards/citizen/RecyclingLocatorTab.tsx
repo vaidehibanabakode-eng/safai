@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MapPin, Navigation, Phone, Clock, Filter, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 
 interface Facility {
   id: string;
@@ -107,24 +109,30 @@ export default function RecyclingLocatorTab() {
   const [selectedCategory, setSelectedCategory] = useState<WasteCategory | 'All'>('All');
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
 
-  const getLocation = () => {
-    if (!navigator.geolocation) {
-      setLocError('Geolocation not supported by your browser.');
-      return;
-    }
+  const getLocation = async () => {
     setLocLoading(true);
     setLocError('');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await Geolocation.requestPermissions();
+        const pos = await Geolocation.getCurrentPosition({ timeout: 8000 });
         setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocLoading(false);
-      },
-      () => {
-        setLocError('Could not get your location. Showing sample facilities nearby.');
-        setLocLoading(false);
-      },
-      { timeout: 8000 }
-    );
+      } else {
+        if (!navigator.geolocation) {
+          setLocError('Geolocation not supported by your browser.');
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => setUserLoc({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => setLocError('Could not get your location. Showing sample facilities nearby.'),
+          { timeout: 8000 }
+        );
+      }
+    } catch {
+      setLocError('Could not get your location. Showing sample facilities nearby.');
+    } finally {
+      setLocLoading(false);
+    }
   };
 
   useEffect(() => {
