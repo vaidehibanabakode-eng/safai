@@ -27,6 +27,7 @@ import {
   CalendarPlus,
   Trophy,
   Award,
+  ScanLine,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -35,6 +36,7 @@ import Layout from '../common/Layout';
 import TrainingSystem from '../training/TrainingSystem';
 import ProfilePage from '../common/ProfilePage';
 import SettingsTab from './tabs/SettingsTab';
+import WasteScannerTab from './citizen/WasteScannerTab';
 import { User } from '../../App';
 import StatCard from '../common/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -517,6 +519,7 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
     { icon: <LayoutDashboard className="w-5 h-5" />, label: t('nav_home'), active: activeTab === 'home', onClick: () => setActiveTab('home') },
     ...(isChampion ? [{ icon: <Trophy className="w-5 h-5 text-yellow-500" />, label: t('champion_hub'), active: activeTab === 'champion', onClick: () => setActiveTab('champion') }] : []),
     { icon: <Truck className="w-5 h-5" />, label: 'Book Collection', active: activeTab === 'collection', onClick: () => setActiveTab('collection') },
+    { icon: <ScanLine className="w-5 h-5" />, label: 'Waste Scanner', active: activeTab === 'scanner', onClick: () => setActiveTab('scanner') },
     { icon: <GraduationCap className="w-5 h-5" />, label: t('nav_education'), active: activeTab === 'training', onClick: () => setActiveTab('training') },
     { icon: <AlertTriangle className="w-5 h-5" />, label: t('nav_report'), active: activeTab === 'report', onClick: () => setActiveTab('report') },
     { icon: <History className="w-5 h-5" />, label: t('nav_track'), active: activeTab === 'track', onClick: () => setActiveTab('track') },
@@ -1036,6 +1039,8 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
           </div >
         );
 
+      case 'scanner':
+        return <WasteScannerTab />;
       case 'collection':
         return <OnDemandCollectionTab userId={user.id} userAddress={user.address || ''} />;
       case 'rewards':
