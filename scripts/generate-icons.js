@@ -24,8 +24,9 @@ async function resizeIcons() {
             await sharp(INPUT_IMAGE)
                 .resize(size, size, {
                     fit: 'contain',
-                    background: { r: 0, g: 0, b: 0, alpha: 0 } // Transparent background
+                    background: { r: 255, g: 255, b: 255, alpha: 1 } // White background
                 })
+                .flatten({ background: { r: 255, g: 255, b: 255 } })
                 .toFile(outputPath);
             console.log(`Created ${name} (${size}x${size})`);
         } catch (error) {
