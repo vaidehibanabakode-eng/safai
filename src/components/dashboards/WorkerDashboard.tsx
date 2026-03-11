@@ -95,11 +95,11 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
           }
         }
 
-        // Sort: IN_PROGRESS first, then ASSIGNED, then COMPLETED, then VERIFIED
+        // Sort: IN_PROGRESS first, then ASSIGNED, then COMPLETED, then ZONAL_APPROVED, then VERIFIED
         fetchedTasks.sort((a, b) => {
-          const rank: Record<string, number> = { 'IN_PROGRESS': 1, 'ASSIGNED': 2, 'COMPLETED': 3, 'VERIFIED': 4 };
-          const rankA = rank[a.workerStatus] || 5;
-          const rankB = rank[b.workerStatus] || 5;
+          const rank: Record<string, number> = { 'IN_PROGRESS': 1, 'ASSIGNED': 2, 'COMPLETED': 3, 'ZONAL_APPROVED': 4, 'VERIFIED': 5 };
+          const rankA = rank[a.workerStatus] || 6;
+          const rankB = rank[b.workerStatus] || 6;
           return rankA - rankB;
         });
 
@@ -292,7 +292,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
   const renderContent = () => {
     switch (activeTab) {
       case 'tasks':
-        const completedCount = tasks.filter(t => t.workerStatus === 'COMPLETED' || t.workerStatus === 'VERIFIED').length;
+        const completedCount = tasks.filter(t => t.workerStatus === 'COMPLETED' || t.workerStatus === 'ZONAL_APPROVED' || t.workerStatus === 'VERIFIED').length;
         const inProgressCount = tasks.filter(t => t.workerStatus === 'IN_PROGRESS').length;
 
         return (
@@ -321,17 +321,18 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ user, onLogout }) => 
                 ) : (
                   <div className="space-y-4">
                     {tasks.map((task) => (
-                      <div key={task.assignmentId} className={`border ${task.workerStatus === 'COMPLETED' || task.workerStatus === 'VERIFIED' ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md transition-shadow`}>
+                      <div key={task.assignmentId} className={`border ${task.workerStatus === 'COMPLETED' || task.workerStatus === 'ZONAL_APPROVED' || task.workerStatus === 'VERIFIED' ? 'border-green-200 bg-green-50/30' : 'border-gray-200'} rounded-xl p-4 hover:shadow-md transition-shadow`}>
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <span className="font-semibold text-gray-900 line-clamp-1 max-w-[200px]">{task.title}</span>
                           </div>
                           <span className={`px-3 py-1 text-[10px] uppercase tracking-wider font-bold rounded-full ${task.workerStatus === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' :
+                            task.workerStatus === 'ZONAL_APPROVED' ? 'bg-teal-100 text-teal-800' :
                             task.workerStatus === 'COMPLETED' ? 'bg-green-100 text-green-800' :
                             task.workerStatus === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                            {task.workerStatus === 'VERIFIED' ? 'Verified' : task.workerStatus.replace('_', ' ')}
+                            {task.workerStatus === 'VERIFIED' ? 'Verified' : task.workerStatus === 'ZONAL_APPROVED' ? 'Zonal Approved' : task.workerStatus.replace('_', ' ')}
                           </span>
                         </div>
                         <div className="mb-4">

@@ -27,6 +27,7 @@ export interface User {
   assignedZone?: string;
   zoneId?: string;
   cityId?: string;
+  wardId?: string;
   preferences?: {
     notifications?: boolean;
     language?: string;
@@ -172,6 +173,7 @@ function App() {
     assignedZone: userProfile.assignedZone || userProfile.area,
     zoneId: userProfile.zoneId,
     cityId: userProfile.cityId,
+    wardId: userProfile.wardId,
     preferences: userProfile.preferences,
   };
 

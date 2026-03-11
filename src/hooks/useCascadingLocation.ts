@@ -20,6 +20,8 @@ export interface Ward {
   name: string;
   zoneId: string;
   cityId: string;
+  lat?: number;
+  lng?: number;
   isActive?: boolean;
 }
 

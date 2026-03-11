@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { useToast } from '../../../contexts/ToastContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface VerificationEntry {
     assignmentId: string;
@@ -23,10 +24,19 @@ interface VerificationEntry {
     evidenceImageUrl?: string;
     evidenceNotes?: string;
     complaintStatus: string;
+    zonalApproval?: {
+        approved: boolean;
+        approvedBy: string;
+        approvedByName: string;
+        approvedAt: any;
+    };
+    wardName?: string;
+    zoneName?: string;
 }
 
 const VerificationTab: React.FC = () => {
     const { error: toastError } = useToast();
+    const { userProfile } = useAuth();
     const [entries, setEntries] = useState<VerificationEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [approvedCount, setApprovedCount] = useState(0);
@@ -36,9 +46,8 @@ const VerificationTab: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
-        // Listen to all COMPLETED assignments
-        // Listen to COMPLETED and VERIFIED assignments
-        const q = query(collection(db, 'assignments'), where('workerStatus', 'in', ['COMPLETED', 'VERIFIED']));
+        // Listen to ZONAL_APPROVED assignments (awaiting admin final approval) and VERIFIED (already done)
+        const q = query(collection(db, 'assignments'), where('workerStatus', 'in', ['ZONAL_APPROVED', 'VERIFIED']));
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const pending: VerificationEntry[] = [];
             let approved = 0;
@@ -47,7 +56,7 @@ const VerificationTab: React.FC = () => {
             for (const assignDoc of snapshot.docs) {
                 const a = assignDoc.data();
 
-                // Already verified — count as approved, skip
+                // Already fully verified by admin — count as approved, skip
                 if (a.workerStatus === 'VERIFIED') {
                     approved++;
                     continue;
@@ -90,6 +99,9 @@ const VerificationTab: React.FC = () => {
                         evidenceImageUrl: evidence?.imageUrl,
                         evidenceNotes: evidence?.notes,
                         complaintStatus: complaint.status,
+                        zonalApproval: a.zonalApproval,
+                        wardName: complaint.wardName || '',
+                        zoneName: complaint.zoneName || '',
                     });
                 } catch (e) {
                     console.error('Error fetching verification entry:', e);
@@ -116,6 +128,12 @@ const VerificationTab: React.FC = () => {
             });
             await updateDoc(doc(db, 'assignments', entry.assignmentId), {
                 workerStatus: 'VERIFIED',
+                adminApproval: {
+                    approved: true,
+                    approvedBy: userProfile?.uid || '',
+                    approvedByName: userProfile?.name || '',
+                    approvedAt: serverTimestamp(),
+                },
                 verifiedAt: serverTimestamp(),
             });
             setIsModalOpen(false);
@@ -137,6 +155,8 @@ const VerificationTab: React.FC = () => {
             });
             await updateDoc(doc(db, 'assignments', entry.assignmentId), {
                 workerStatus: 'ASSIGNED',
+                zonalApproval: null,
+                adminApproval: null,
                 updatedAt: serverTimestamp(),
             });
             setIsModalOpen(false);
@@ -165,8 +185,8 @@ const VerificationTab: React.FC = () => {
     return (
         <div className="space-y-8 relative">
             <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Work Verification</h2>
-                <p className="text-gray-600">Review worker task completions and photo evidence</p>
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">Final Verification (Admin Approval)</h2>
+                <p className="text-gray-600">Review zonal-approved work completions — both zonal and admin approval required</p>
             </div>
 
             {/* Stats */}
@@ -274,6 +294,18 @@ const VerificationTab: React.FC = () => {
                                         <Clock className="w-3 h-3" />
                                         <span>Completed: {formatTime(entry.completedAt)}</span>
                                     </div>
+                                    {entry.zonalApproval && (
+                                        <div className="flex items-center gap-1.5 text-xs text-emerald-600 mt-1">
+                                            <CheckCircle className="w-3 h-3" />
+                                            <span>Zonal Approved by: {entry.zonalApproval.approvedByName || 'Zonal Admin'}</span>
+                                        </div>
+                                    )}
+                                    {(entry.wardName || entry.zoneName) && (
+                                        <div className="flex items-center gap-1.5 text-xs text-blue-500 mt-0.5">
+                                            <MapPin className="w-3 h-3" />
+                                            <span>{entry.wardName}{entry.zoneName ? ` · ${entry.zoneName}` : ''}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Actions */}
@@ -374,6 +406,28 @@ const VerificationTab: React.FC = () => {
                                         </p>
                                     </div>
                                 )}
+                                {selectedEntry.zonalApproval && (
+                                    <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                                            Zonal Admin Approval
+                                        </p>
+                                        <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg flex items-center gap-2">
+                                            <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-semibold text-emerald-800">Approved by {selectedEntry.zonalApproval.approvedByName || 'Zonal Admin'}</p>
+                                                <p className="text-xs text-emerald-600">{formatTime(selectedEntry.zonalApproval.approvedAt)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {(selectedEntry.wardName || selectedEntry.zoneName) && (
+                                    <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                                            Ward / Zone
+                                        </p>
+                                        <p className="text-gray-700 text-sm">{selectedEntry.wardName}{selectedEntry.zoneName ? ` · ${selectedEntry.zoneName}` : ''}</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -391,7 +445,7 @@ const VerificationTab: React.FC = () => {
                                 className="px-5 py-2.5 text-sm font-bold text-white bg-green-600 rounded-xl hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
                             >
                                 {reviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                Approve & Resolve
+                                Final Approve & Resolve
                             </button>
                         </div>
                     </div>

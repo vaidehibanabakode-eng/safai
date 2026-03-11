@@ -9,6 +9,7 @@ import {
 import { db } from '../../../lib/firebase';
 import { useToast } from '../../../contexts/ToastContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface VerificationEntry {
   assignmentId: string;
@@ -30,6 +31,7 @@ interface ZonalVerificationTabProps {
 const ZonalVerificationTab: React.FC<ZonalVerificationTabProps> = ({ zoneId }) => {
   const { t } = useLanguage();
   const { success, error: toastError } = useToast();
+  const { userProfile } = useAuth();
   const [entries, setEntries] = useState<VerificationEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [approvedCount, setApprovedCount] = useState(0);
@@ -72,7 +74,7 @@ const ZonalVerificationTab: React.FC<ZonalVerificationTabProps> = ({ zoneId }) =
         const assignQ = query(
           collection(db, 'assignments'),
           where('workerId', 'in', batch),
-          where('workerStatus', 'in', ['COMPLETED', 'VERIFIED', 'REJECTED']),
+          where('workerStatus', 'in', ['COMPLETED', 'ZONAL_APPROVED', 'VERIFIED', 'REJECTED']),
         );
 
         const assignSnap = await getDocs(assignQ);
@@ -103,7 +105,7 @@ const ZonalVerificationTab: React.FC<ZonalVerificationTabProps> = ({ zoneId }) =
             }
           } catch { /* ignore */ }
 
-          if (aData.workerStatus === 'VERIFIED') approved++;
+          if (aData.workerStatus === 'VERIFIED' || aData.workerStatus === 'ZONAL_APPROVED') approved++;
           if (aData.workerStatus === 'REJECTED') rejected++;
 
           allEntries.push({
@@ -143,19 +145,27 @@ const ZonalVerificationTab: React.FC<ZonalVerificationTabProps> = ({ zoneId }) =
     } catch { setEvidenceList([]); }
   };
 
-  const handleVerify = async (action: 'VERIFIED' | 'REJECTED') => {
+  const handleVerify = async (action: 'ZONAL_APPROVED' | 'REJECTED') => {
     if (!selectedEntry) return;
     setReviewing(true);
     try {
       await updateDoc(doc(db, 'assignments', selectedEntry.assignmentId), {
         workerStatus: action,
+        ...(action === 'ZONAL_APPROVED' && {
+          zonalApproval: {
+            approved: true,
+            approvedBy: userProfile?.uid || '',
+            approvedByName: userProfile?.name || '',
+            approvedAt: serverTimestamp(),
+          },
+        }),
         verifiedAt: serverTimestamp(),
       });
-      // Update complaint status too
-      if (action === 'VERIFIED') {
-        await updateDoc(doc(db, 'complaints', selectedEntry.complaintId), { status: 'RESOLVED', updatedAt: serverTimestamp() });
+      // Update complaint status
+      if (action === 'ZONAL_APPROVED') {
+        await updateDoc(doc(db, 'complaints', selectedEntry.complaintId), { status: 'ZONAL_APPROVED', updatedAt: serverTimestamp() });
       }
-      success(action === 'VERIFIED' ? 'Work verified successfully' : 'Work rejected');
+      success(action === 'ZONAL_APPROVED' ? 'Zonal approval granted — awaiting admin final approval' : 'Work rejected');
       setIsModalOpen(false);
       setSelectedEntry(null);
 
@@ -163,7 +173,7 @@ const ZonalVerificationTab: React.FC<ZonalVerificationTabProps> = ({ zoneId }) =
       setEntries((prev) => prev.map((e) =>
         e.assignmentId === selectedEntry.assignmentId ? { ...e, workerStatus: action } : e,
       ));
-      if (action === 'VERIFIED') setApprovedCount((c) => c + 1);
+      if (action === 'ZONAL_APPROVED') setApprovedCount((c) => c + 1);
       if (action === 'REJECTED') setRejectedCount((c) => c + 1);
     } catch (error) {
       console.error('Verification error:', error);
@@ -178,7 +188,7 @@ const ZonalVerificationTab: React.FC<ZonalVerificationTabProps> = ({ zoneId }) =
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{t('work_verification') || 'Work Verification'}</h2>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">{t('zone_verification_subtitle') || 'Review and verify worker task completions'}</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">{t('zone_verification_subtitle') || 'Review worker completions — your approval will be forwarded to Admin for final verification'}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -263,9 +273,9 @@ const ZonalVerificationTab: React.FC<ZonalVerificationTabProps> = ({ zoneId }) =
                 <button onClick={() => handleVerify('REJECTED')} disabled={reviewing} className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center gap-2">
                   <ThumbsDown className="w-4 h-4" /> {t('reject') || 'Reject'}
                 </button>
-                <button onClick={() => handleVerify('VERIFIED')} disabled={reviewing} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2">
+                <button onClick={() => handleVerify('ZONAL_APPROVED')} disabled={reviewing} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2">
                   {reviewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
-                  {t('approve') || 'Approve'}
+                  {t('approve') || 'Approve (Zonal)'}
                 </button>
               </div>
             </div>

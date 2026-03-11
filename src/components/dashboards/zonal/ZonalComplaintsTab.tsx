@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ClipboardList, CheckCircle, AlertCircle, MoreVertical,
-  Eye, UserPlus, X, Loader2,
+  Eye, UserPlus, X, Loader2, Trash2,
 } from 'lucide-react';
 import StatCard from '../../common/StatCard';
 import {
@@ -27,6 +27,9 @@ interface Complaint {
   lat?: number;
   lng?: number;
   zoneId?: string;
+  wardId?: string;
+  wardName?: string;
+  zoneName?: string;
   assignedWorkerIds?: string[];
 }
 
@@ -97,28 +100,17 @@ const ZonalComplaintsTab: React.FC<ZonalComplaintsTabProps> = ({ zoneId }) => {
   useEffect(() => {
     if (!zoneId) return;
 
-    const workersQ = query(
-      collection(db, 'users'),
-      where('role', 'in', ['Worker', 'worker']),
+    // Query complaints that belong to this zone directly (set by citizen at submission)
+    const complaintsQ = query(
+      collection(db, 'complaints'),
       where('zoneId', '==', zoneId),
     );
 
-    let workerIds: string[] = [];
-
-    const unsubWorkers = onSnapshot(workersQ, (snap) => {
-      workerIds = snap.docs.map((d) => d.id);
-    });
-
-    const unsubComplaints = onSnapshot(collection(db, 'complaints'), (snap) => {
+    const unsubComplaints = onSnapshot(complaintsQ, (snap) => {
       const fetched: Complaint[] = [];
       snap.forEach((d) => {
         const data = d.data() as Omit<Complaint, 'id'>;
-        const isZone =
-          data.zoneId === zoneId ||
-          data.assignedWorkerIds?.some((wid) => workerIds.includes(wid));
-        if (isZone) {
-          fetched.push({ id: d.id, ...data });
-        }
+        fetched.push({ id: d.id, ...data });
       });
       fetched.sort((a, b) => {
         if (!a.createdAt || !b.createdAt) return 0;
@@ -128,7 +120,7 @@ const ZonalComplaintsTab: React.FC<ZonalComplaintsTabProps> = ({ zoneId }) => {
       setLoading(false);
     });
 
-    return () => { unsubWorkers(); unsubComplaints(); };
+    return () => { unsubComplaints(); };
   }, [zoneId]);
 
   const toggleDropdown = (id: string) => setActiveDropdown(activeDropdown === id ? null : id);
@@ -270,6 +262,7 @@ const ZonalComplaintsTab: React.FC<ZonalComplaintsTabProps> = ({ zoneId }) => {
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('title') || 'Title / Type'}</th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ward</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('location') || 'Location'}</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('date') || 'Date'}</th>
                   <th className="px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('status') || 'Status'}</th>
@@ -283,6 +276,7 @@ const ZonalComplaintsTab: React.FC<ZonalComplaintsTabProps> = ({ zoneId }) => {
                       <div className="text-sm font-medium text-gray-900 dark:text-white">{complaint.title}</div>
                       <div className="text-xs text-gray-500">{complaint.category}</div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{complaint.wardName || '—'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[200px] truncate">{complaint.location}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {complaint.createdAt ? new Date(complaint.createdAt.toMillis()).toLocaleDateString() : 'N/A'}
@@ -292,9 +286,10 @@ const ZonalComplaintsTab: React.FC<ZonalComplaintsTabProps> = ({ zoneId }) => {
                         complaint.status === 'RESOLVED' || complaint.status === 'CLOSED' ? 'bg-green-100 text-green-800' :
                         complaint.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
                         complaint.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
+                        complaint.status === 'ZONAL_APPROVED' ? 'bg-teal-100 text-teal-800' :
                         'bg-purple-100 text-purple-800'
                       }`}>
-                        {complaint.status}
+                        {complaint.status === 'ZONAL_APPROVED' ? 'ZONAL APPROVED' : complaint.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right dropdown-container relative">
@@ -302,16 +297,19 @@ const ZonalComplaintsTab: React.FC<ZonalComplaintsTabProps> = ({ zoneId }) => {
                         <MoreVertical className="w-5 h-5" />
                       </button>
                       {activeDropdown === complaint.id && (
-                        <div className="absolute right-6 top-10 mt-2 w-48 rounded-xl shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-[50]">
+                        <div className="absolute top-full right-0 mt-2 min-w-[180px] w-48 rounded-xl shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
                           <div className="py-1" role="menu">
-                            <button onClick={() => handleViewDetail(complaint.id, complaint.status)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                            <button onClick={() => handleViewDetail(complaint.id, complaint.status)} className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                               <Eye className="w-4 h-4 text-gray-500" /> {t('view') || 'View / Review'}
                             </button>
                             {(complaint.status === 'SUBMITTED' || complaint.status === 'UNDER_REVIEW') && (
-                              <button onClick={() => openAssignModal(complaint.id)} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                              <button onClick={() => openAssignModal(complaint.id)} className="w-full text-left px-4 py-2 text-sm font-medium text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900 flex items-center gap-2">
                                 <UserPlus className="w-4 h-4 text-green-500" /> {t('assign_workers') || 'Assign Workers'}
                               </button>
                             )}
+                            <button onClick={() => handleDeleteComplaint(complaint.id)} className="w-full text-left px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 flex items-center gap-2">
+                              <Trash2 className="w-4 h-4 text-red-500" /> {t('delete') || 'Delete'}
+                            </button>
                           </div>
                         </div>
                       )}

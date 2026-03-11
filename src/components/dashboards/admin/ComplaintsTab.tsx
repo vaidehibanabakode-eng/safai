@@ -22,6 +22,11 @@ interface Complaint {
     createdAt: any;
     lat?: number;
     lng?: number;
+    wardId?: string;
+    wardName?: string;
+    zoneId?: string;
+    zoneName?: string;
+    cityId?: string;
 }
 
 interface Worker {
@@ -349,6 +354,7 @@ const ComplaintsTab: React.FC = () => {
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Title / Type</th>
+                                    <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Ward / Zone</th>
                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                     <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -362,6 +368,10 @@ const ComplaintsTab: React.FC = () => {
                                             <div className="text-sm font-medium text-gray-900">{complaint.title}</div>
                                             <div className="text-xs text-gray-500">{complaint.category}</div>
                                         </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <div className="text-xs font-medium text-gray-700">{complaint.wardName || '—'}</div>
+                                            <div className="text-xs text-gray-400">{complaint.zoneName || ''}</div>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[200px] truncate">
                                             {complaint.location}
                                         </td>
@@ -372,9 +382,10 @@ const ComplaintsTab: React.FC = () => {
                                             <span className={`inline-flex px-2 py-1 text-[10px] font-bold uppercase rounded-full tracking-wider ${complaint.status === 'RESOLVED' || complaint.status === 'CLOSED' ? 'bg-green-100 text-green-800' :
                                                 complaint.status === 'ASSIGNED' ? 'bg-blue-100 text-blue-800' :
                                                     complaint.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
-                                                        'bg-purple-100 text-purple-800'
+                                                        complaint.status === 'ZONAL_APPROVED' ? 'bg-teal-100 text-teal-800' :
+                                                            'bg-purple-100 text-purple-800'
                                                 }`}>
-                                                {complaint.status}
+                                                {complaint.status === 'ZONAL_APPROVED' ? 'ZONAL APPROVED' : complaint.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right dropdown-container relative">
@@ -386,7 +397,7 @@ const ComplaintsTab: React.FC = () => {
                                             </button>
 
                                             {activeDropdown === complaint.id && (
-                                                <div className="absolute right-6 top-10 mt-2 w-48 rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[50] animate-in fade-in zoom-in duration-200">
+                                                <div className="absolute top-full right-0 mt-2 min-w-[180px] rounded-xl shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 animate-in fade-in zoom-in duration-200">
                                                     <div className="py-1" role="menu" aria-label="Complaint actions">
                                                         <button
                                                             role="menuitem"

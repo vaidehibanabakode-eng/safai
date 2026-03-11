@@ -43,6 +43,8 @@ import StatCard from '../common/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useSpeechToText } from '../../hooks/useSpeechToText';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCascadingLocation } from '../../hooks/useCascadingLocation';
+import { useAutoWardDetection } from '../../hooks/useAutoWardDetection';
 
 
 interface CitizenDashboardProps {
@@ -89,6 +91,13 @@ const StatusBadge = ({ status }: { status: string }) => {
       </span>
     );
   }
+  if (normalizedStatus === 'ZONAL_APPROVED') {
+    return (
+      <span className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full bg-teal-100 text-teal-800">
+        ZONAL APPROVED
+      </span>
+    );
+  }
   return (
     <span className="px-3 py-1 text-[10px] uppercase font-bold tracking-wider rounded-full bg-yellow-100 text-yellow-800">
       {status.replace('_', ' ')}
@@ -103,6 +112,26 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
   const [description, setDescription] = useState('');
   const [issueType, setIssueType] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Ward selection for complaint routing
+  const locationSelector = useCascadingLocation();
+  const wardDetection = useAutoWardDetection();
+  const [manualWardMode, setManualWardMode] = useState(false);
+
+  // When pending auto-detection completes (data loaded after GPS), apply results
+  React.useEffect(() => {
+    if (wardDetection.detected && !manualWardMode) {
+      const r = wardDetection.detected;
+      locationSelector.setSelectedCityId(r.cityId);
+      setTimeout(() => {
+        locationSelector.setSelectedZoneId(r.zoneId);
+        setTimeout(() => {
+          locationSelector.setSelectedWardId(r.wardId);
+        }, 300);
+      }, 300);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wardDetection.detected]);
 
   // ── Draft key is per-user so different accounts don't share drafts ──────
   const DRAFT_KEY = `draft_complaint_${user?.id}`;
@@ -397,14 +426,30 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
         longitude = position.coords.longitude;
       }
 
+      let cityHint = '';
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
         );
         const data = await res.json();
         setLocation(data.display_name || `${latitude}, ${longitude}`);
+        // Extract city name for ward detection fallback
+        cityHint = data.address?.city || data.address?.town || data.address?.state_district || '';
       } catch {
         setLocation(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+      }
+
+      // Auto-detect ward/zone/city from GPS coordinates
+      const result = wardDetection.detectWard(latitude, longitude, cityHint);
+      if (result) {
+        locationSelector.setSelectedCityId(result.cityId);
+        setTimeout(() => {
+          locationSelector.setSelectedZoneId(result.zoneId);
+          setTimeout(() => {
+            locationSelector.setSelectedWardId(result.wardId);
+          }, 300);
+        }, 300);
+        setManualWardMode(false);
       }
     } catch (e) {
       console.warn('Unable to fetch location', e);
@@ -439,6 +484,10 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
 
     if (!issueType) {
       setSubmitError('Please select an issue type.');
+      return;
+    }
+    if (!locationSelector.selectedWardId && !wardDetection.detected) {
+      setSubmitError('Please detect your location or manually select your ward.');
       return;
     }
     if (!location) {
@@ -478,6 +527,15 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
       // Grab GPS coords from the first geo-tagged photo (if any)
       const geoPhoto = photos.find(p => p.lat != null);
 
+      // Get ward/zone/city names for display (prefer manual selection, fallback to auto-detected)
+      const det = wardDetection.detected;
+      const finalCityId = locationSelector.selectedCityId || det?.cityId || '';
+      const finalZoneId = locationSelector.selectedZoneId || det?.zoneId || '';
+      const finalWardId = locationSelector.selectedWardId || det?.wardId || '';
+      const finalCityName = locationSelector.cities.find(c => c.id === finalCityId)?.name || det?.cityName || '';
+      const finalZoneName = locationSelector.zones.find(z => z.id === finalZoneId)?.name || det?.zoneName || '';
+      const finalWardName = locationSelector.wards.find(w => w.id === finalWardId)?.name || det?.wardName || '';
+
       const complaintData: Record<string, any> = {
         title: issueType,
         description: description.trim(),
@@ -487,6 +545,12 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
         citizenId: user.id,
         citizenName: user.name || '',
         imageUrl: imageUrl,
+        cityId: finalCityId,
+        cityName: finalCityName,
+        zoneId: finalZoneId,
+        zoneName: finalZoneName,
+        wardId: finalWardId,
+        wardName: finalWardName,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         ...(geoPhoto?.lat != null && geoPhoto?.lng != null && {
@@ -504,6 +568,11 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
       setDescription('');
       setLocation('');
       setPhotos([]);
+      locationSelector.setSelectedCityId('');
+      locationSelector.setSelectedZoneId('');
+      locationSelector.setSelectedWardId('');
+      wardDetection.clearDetected();
+      setManualWardMode(false);
 
       // Clear success message after 4s
       setTimeout(() => setSubmitSuccess(''), 4000);
@@ -666,6 +735,94 @@ const CitizenDashboard: React.FC<CitizenDashboardProps> = ({ user, onLogout, isC
               )}
 
               <form className="space-y-6" onSubmit={handleSubmitReport}>
+                {/* Auto-detected Ward / Zone — with manual override */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-blue-800">
+                      {wardDetection.detected ? '📍 Ward auto-detected from your location' : 'Ward / Zone for complaint routing'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setManualWardMode(!manualWardMode)}
+                      className="text-xs text-blue-600 underline hover:text-blue-800"
+                    >
+                      {manualWardMode ? 'Use auto-detect' : 'Select manually'}
+                    </button>
+                  </div>
+
+                  {/* Auto-detected display */}
+                  {!manualWardMode && wardDetection.detected && (
+                    <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg p-3">
+                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <div className="text-sm">
+                        <span className="font-semibold text-gray-900">{wardDetection.detected.wardName}</span>
+                        <span className="text-gray-500"> · {wardDetection.detected.zoneName} · {wardDetection.detected.cityName}</span>
+                        {wardDetection.detected.distanceKm != null && (
+                          <span className="text-xs text-gray-400 ml-2">({wardDetection.detected.distanceKm} km away)</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!manualWardMode && wardDetection.detecting && (
+                    <div className="flex items-center gap-2 text-sm text-blue-600">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Detecting your ward...</span>
+                    </div>
+                  )}
+
+                  {!manualWardMode && !wardDetection.detected && !wardDetection.detecting && (
+                    <p className="text-xs text-gray-500">Click "Detect Location" below to auto-detect your ward, or select manually.</p>
+                  )}
+
+                  {/* Manual override dropdowns */}
+                  {manualWardMode && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                        <select
+                          value={locationSelector.selectedCityId}
+                          onChange={(e) => locationSelector.setSelectedCityId(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 text-sm"
+                        >
+                          <option value="">Select City</option>
+                          {locationSelector.cities.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Zone</label>
+                        <select
+                          value={locationSelector.selectedZoneId}
+                          onChange={(e) => locationSelector.setSelectedZoneId(e.target.value)}
+                          disabled={!locationSelector.selectedCityId}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 text-sm disabled:opacity-50"
+                        >
+                          <option value="">Select Zone</option>
+                          {locationSelector.zones.map((z) => (
+                            <option key={z.id} value={z.id}>{z.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Ward</label>
+                        <select
+                          value={locationSelector.selectedWardId}
+                          onChange={(e) => locationSelector.setSelectedWardId(e.target.value)}
+                          disabled={!locationSelector.selectedZoneId}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-100 text-sm disabled:opacity-50"
+                        >
+                          <option value="">Select Ward</option>
+                          {locationSelector.wards.map((w) => (
+                            <option key={w.id} value={w.id}>{w.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     {t('issue_type')}

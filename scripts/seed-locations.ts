@@ -30,7 +30,7 @@ interface CityData {
   zones: {
     id: string;
     name: string;
-    wards: { id: string; name: string }[];
+    wards: { id: string; name: string; lat: number; lng: number }[];
   }[];
 }
 
@@ -43,52 +43,52 @@ const CITIES: CityData[] = [
         id: 'zone_dharampeth',
         name: 'Dharampeth',
         wards: [
-          { id: 'ward_13', name: 'Ward 13' },
-          { id: 'ward_14', name: 'Ward 14' },
-          { id: 'ward_15', name: 'Ward 15' },
+          { id: 'ward_13', name: 'Ward 13', lat: 21.1520, lng: 79.0720 },
+          { id: 'ward_14', name: 'Ward 14', lat: 21.1480, lng: 79.0680 },
+          { id: 'ward_15', name: 'Ward 15', lat: 21.1450, lng: 79.0750 },
         ],
       },
       {
         id: 'zone_laxminagar',
         name: 'Laxmi Nagar',
         wards: [
-          { id: 'ward_21', name: 'Ward 21' },
-          { id: 'ward_22', name: 'Ward 22' },
-          { id: 'ward_23', name: 'Ward 23' },
+          { id: 'ward_21', name: 'Ward 21', lat: 21.1350, lng: 79.0550 },
+          { id: 'ward_22', name: 'Ward 22', lat: 21.1320, lng: 79.0600 },
+          { id: 'ward_23', name: 'Ward 23', lat: 21.1300, lng: 79.0520 },
         ],
       },
       {
         id: 'zone_hanuman_nagar',
         name: 'Hanuman Nagar',
         wards: [
-          { id: 'ward_31', name: 'Ward 31' },
-          { id: 'ward_32', name: 'Ward 32' },
+          { id: 'ward_31', name: 'Ward 31', lat: 21.1250, lng: 79.0850 },
+          { id: 'ward_32', name: 'Ward 32', lat: 21.1220, lng: 79.0900 },
         ],
       },
       {
         id: 'zone_nehru_nagar',
         name: 'Nehru Nagar',
         wards: [
-          { id: 'ward_41', name: 'Ward 41' },
-          { id: 'ward_42', name: 'Ward 42' },
-          { id: 'ward_43', name: 'Ward 43' },
+          { id: 'ward_41', name: 'Ward 41', lat: 21.1400, lng: 79.1000 },
+          { id: 'ward_42', name: 'Ward 42', lat: 21.1370, lng: 79.1050 },
+          { id: 'ward_43', name: 'Ward 43', lat: 21.1340, lng: 79.0980 },
         ],
       },
       {
         id: 'zone_satranjipura',
         name: 'Satranjipura',
         wards: [
-          { id: 'ward_51', name: 'Ward 51' },
-          { id: 'ward_52', name: 'Ward 52' },
+          { id: 'ward_51', name: 'Ward 51', lat: 21.1180, lng: 79.0780 },
+          { id: 'ward_52', name: 'Ward 52', lat: 21.1150, lng: 79.0830 },
         ],
       },
       {
         id: 'zone_lakadganj',
         name: 'Lakadganj',
         wards: [
-          { id: 'ward_61', name: 'Ward 61' },
-          { id: 'ward_62', name: 'Ward 62' },
-          { id: 'ward_63', name: 'Ward 63' },
+          { id: 'ward_61', name: 'Ward 61', lat: 21.1600, lng: 79.0950 },
+          { id: 'ward_62', name: 'Ward 62', lat: 21.1570, lng: 79.1000 },
+          { id: 'ward_63', name: 'Ward 63', lat: 21.1540, lng: 79.0920 },
         ],
       },
     ],
@@ -101,16 +101,16 @@ const CITIES: CityData[] = [
         id: 'zone_andheri',
         name: 'Andheri',
         wards: [
-          { id: 'ward_andheri_1', name: 'K/West Ward' },
-          { id: 'ward_andheri_2', name: 'K/East Ward' },
+          { id: 'ward_andheri_1', name: 'K/West Ward', lat: 19.1365, lng: 72.8296 },
+          { id: 'ward_andheri_2', name: 'K/East Ward', lat: 19.1190, lng: 72.8580 },
         ],
       },
       {
         id: 'zone_bandra',
         name: 'Bandra',
         wards: [
-          { id: 'ward_bandra_1', name: 'H/West Ward' },
-          { id: 'ward_bandra_2', name: 'H/East Ward' },
+          { id: 'ward_bandra_1', name: 'H/West Ward', lat: 19.0544, lng: 72.8260 },
+          { id: 'ward_bandra_2', name: 'H/East Ward', lat: 19.0650, lng: 72.8500 },
         ],
       },
     ],
@@ -123,16 +123,16 @@ const CITIES: CityData[] = [
         id: 'zone_south_delhi',
         name: 'South Delhi',
         wards: [
-          { id: 'ward_south_1', name: 'Mehrauli Ward' },
-          { id: 'ward_south_2', name: 'Vasant Kunj Ward' },
+          { id: 'ward_south_1', name: 'Mehrauli Ward', lat: 28.5245, lng: 77.1855 },
+          { id: 'ward_south_2', name: 'Vasant Kunj Ward', lat: 28.5200, lng: 77.1570 },
         ],
       },
       {
         id: 'zone_central_delhi',
         name: 'Central Delhi',
         wards: [
-          { id: 'ward_central_1', name: 'Connaught Place Ward' },
-          { id: 'ward_central_2', name: 'Karol Bagh Ward' },
+          { id: 'ward_central_1', name: 'Connaught Place Ward', lat: 28.6315, lng: 77.2167 },
+          { id: 'ward_central_2', name: 'Karol Bagh Ward', lat: 28.6519, lng: 77.1906 },
         ],
       },
     ],
@@ -170,6 +170,8 @@ async function seed() {
           name: ward.name,
           zoneId: zone.id,
           cityId,
+          lat: ward.lat,
+          lng: ward.lng,
           isActive: true,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
